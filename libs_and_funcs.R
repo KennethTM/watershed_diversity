@@ -1,4 +1,4 @@
-library(sf);library(raster);library(rgdal);library(gdalUtils);library(tidyverse);library(readxl)
+library(sf);library(raster);library(rgdal);library(gdalUtils);library(tidyverse);library(readxl);library(lubridate)
 library(rgrass7);library(link2GI)
 
 #Projection, as EPSG number, used for spatial analysis (UTM ZONE 32)

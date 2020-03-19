@@ -56,10 +56,25 @@ dem_basins_sf <- dem_basins_sp %>%
   group_by(value) %>% 
   summarise() %>% 
   select(basin_id = value) %>% 
-  st_cast("MULTIPOLYGON")
+  st_cast("MULTIPOLYGON") %>% 
+  st_set_crs(dk_epsg)
 
 st_write(dem_basins_sf, dsn = gis_database, layer = "basins", delete_layer = TRUE)
 
 #Delineate lake watersheds
 
+
+
+
+#join fish and lakes, extract the polys, export to grass, delineate watersheds, export and collect in R, write to database
+
+lakes <- st_read(dsn = gis_database, layer = "dk_lakes")
+fish <- st_read(dsn = gis_database, layer = "fish_species_lakes")
+
+tmp <- fish %>% 
+  select(system, site_id) %>% 
+  distinct(.keep_all = TRUE) %>% 
+  st_join(lakes, left = FALSE) 
+
+pull(gml_id)
 
