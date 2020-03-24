@@ -75,6 +75,9 @@ dk_lakes_sub <- dk_lakes %>%
 
 writeVECT(as(dk_lakes_sub[, "lake_basin_id"], "Spatial"), "dk_lakes_sub", v.in.ogr_flags = "overwrite")
 
+#Save lake subset in database
+st_write(dk_lakes_sub, dsn = gis_database, layer = "dk_lakes_sub", delete_layer = TRUE)
+
 #Delineate watersheds using gml_id for lake polygons id's
 lake_basin_indexes <- dk_lakes_sub$lake_basin_id
 for(i in lake_basin_indexes){

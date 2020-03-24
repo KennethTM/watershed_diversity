@@ -83,12 +83,6 @@ fish_lake_species <- fish_lake_species_raw %>%
   select(-data) %>% 
   unnest(na_if_zerocatch)
 
-# #Count number of fish caught for each sampling
-# fish_lake_species_count <- fish_lake_species %>% 
-#   group_by(system, site_id, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, year) %>% 
-#   summarise(n_spec = ifelse(any(is.na(name_local)), 0, length(unique(name_local)))) %>% 
-#   ungroup()
-
 #Stream fish, used to define basin species pool
 fish_stream_raw <- read_xlsx(paste0(getwd(), "/data_raw/", "odaforalle_fish_stream.xlsx"))
 fish_stream_species <- fish_stream_raw %>% 
