@@ -9,15 +9,14 @@ source("libs_and_funcs.R")
 
 #Write vector files for further processing to gis_database
 
-#Download Denmark polygon, cut Bornholm and reproject
+#Download Denmark polygon and reproject
 dk_border_raw <- getData("GADM", country = "DNK", level = 0, path = paste0(getwd(), "/data_raw"))
 
 dk_border <- dk_border_raw %>% 
   st_as_sf() %>% 
-  st_crop(xmin = 8, ymin = 54.56, xmax = 14, ymax = 57.76) %>% 
   st_transform(dk_epsg)
 
-st_write(dk_border, dsn = gis_database, layer = "dk_border", delete_layer = TRUE)
+st_write(dk_border, dsn = gis_database, layer = "dk_border", delete_layer = TRUE) #, dataset_options = "SPATIALITE=YES"
 
 #Reproject and cut EU-DEM using dk_poly
 #Cut and reproject
@@ -42,7 +41,8 @@ ogr2ogr(paste0(getwd(), "/data_raw/DK_StandingWater.gml"),
         overwrite = TRUE,
         t_srs = paste0("EPSG:", dk_epsg),
         dim = 2,
-        select = "gml_id,elevation")
+        select = "gml_id, elevation",
+        lco = "geometry_name=GEOMETRY")
 
 ogr2ogr(paste0(getwd(), "/data_raw/DK_WatercourseLink.gml"),
         gis_database,
@@ -136,7 +136,7 @@ fish_species_sub <- fish_species %>%
 
 #Basin fish species pool is all species in streams and lakes found since 1990
 fish_species_basin <- fish_species_sub %>% 
-  filter(year > 1990) %>% 
+  filter(year >= 1990) %>% 
   select(-year) %>% 
   na.omit() %>% 
   distinct()

@@ -27,7 +27,6 @@ fish_lake_species_count <- fish_species_lakes %>%
 
 
 
-
 #Quick exploration of initial data
 #Join lake fish data with basin species richness and lake area
 lake_basin_richness <- fish_lake_species_count %>% 
@@ -41,7 +40,7 @@ model_df <- lake_basin_richness %>%
          lake_basin_spec_ratio = n_spec_lake/n_spec_basin,
          basin_area_log10 = log10(basin_area),
          lake_area_log10 = log10(lake_area)) %>% 
-  select(n_spec_lake, n_spec_basin, lake_basin_spec_ratio, basin_area_log10, lake_area_log10, lake_basin_area_ratio, elevation) %>% 
+  select(system, n_spec_lake, n_spec_basin, lake_basin_spec_ratio, basin_area_log10, lake_area_log10, lake_basin_area_ratio, elevation) %>% 
   na.omit()
 
 #Binomial glm model
@@ -58,3 +57,4 @@ y.transf.betareg <- function(y){
 library(betareg)
 mod_1 <- betareg(y.transf.betareg(lake_basin_spec_ratio) ~ basin_area_log10 + lake_area_log10 + elevation, data=model_df)
 summary(mod_1)
+
