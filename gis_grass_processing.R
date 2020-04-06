@@ -18,10 +18,10 @@ link2GI::linkGRASS7(dk_dem_25,
 use_sp()
 
 #Import dem
-execGRASS("r.in.gdal", flags = c("o"), parameters = list(input = dk_dem_25_path, output = "dem"))
+execGRASS("r.in.gdal", flags = c("overwrite"), parameters = list(input = dk_dem_25_path, output = "dem"))
 
 #Corrections using hydrodem
-execGRASS("r.hydrodem", flags = c("overwrite"), parameters = list(input = "dem", output = "dem_hydrodem", memory = 4000))
+execGRASS("r.hydrodem", flags = c("overwrite"), parameters = list(input = "dem", output = "dem_hydrodem", memory = 8000))
 
 #Extract streams and flow directions using r.watershed
 execGRASS("r.watershed", flags = c("overwrite", "b"),
@@ -30,14 +30,14 @@ execGRASS("r.watershed", flags = c("overwrite", "b"),
                             stream = "dem_stream",
                             drainage = "dem_drain",
                             threshold = 1000,
-                            memory = 4000))
+                            memory = 8000))
 
 #Determine major watersheds using r.stream.basins
 execGRASS("r.stream.basins", flags = c("overwrite", "l", "c"), 
           parameters = list(direction = "dem_drain",
                             stream_rast = "dem_stream",
                             basins = "dem_basins",
-                            memory = 4000))
+                            memory = 8000))
 
 #Convert raster to vector file
 execGRASS("r.to.vect", flags = c("s", "overwrite"), 
@@ -58,6 +58,12 @@ dem_basins_sf <- dem_basins_sp %>%
 
 st_write(dem_basins_sf, dsn = gis_database, layer = "dk_basins", delete_layer = TRUE)
 
+
+
+
+
+
+
 #Delineate lake watersheds
 #Find lakes with fish species data
 dk_lakes <- st_read(dsn = gis_database, layer = "dk_lakes")
@@ -66,7 +72,12 @@ fish_species_lakes <- st_read(dsn = gis_database, layer = "fish_species_lakes")
 fish_species_lakes_polys <- fish_species_lakes %>% 
   select(system, site_id) %>% 
   distinct(.keep_all = TRUE) %>% #300 lakes with fish data
-  st_join(dk_lakes, left = FALSE) #Polygons for 287 site_ids but only 278 polygons - some polygons are shared between site_id's
+  #st_join(dk_lakes) %>% 
+  #filter(is.na(gml_id)) %>%  #Lakes with fish data but no lake polygon
+  #st_write("fish_data_with_no_polygon.sqlite")
+  st_join(dk_lakes, left = FALSE) #%>% #Polygons for 287 site_ids but only 278 polygons - some polygons are shared between site_id's
+  #group_by(gml_id) %>% add_tally() %>% filter(n > 1) %>% st_write("fish_data_with_more_than_one_polygon.sqlite")
+
 
 #Extract lake polygons and export to grass
 dk_lakes_sub <- dk_lakes %>% 

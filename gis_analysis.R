@@ -6,24 +6,41 @@ st_layers(gis_database)
 
 dk_lakes <- st_read(dsn = gis_database, layer = "dk_lakes") %>% 
   mutate(lake_area = as.numeric(st_area(geometry)))
+
 dk_basins <- st_read(dsn = gis_database, layer = "dk_basins")
 
 fish_species_lakes <- st_read(dsn = gis_database, layer = "fish_species_lakes")
-fish_species_basin <- st_read(dsn = gis_database, layer = "fish_species_basin")
+
+fish_species_basin <- st_read(dsn = gis_database, layer = "fish_species_basin") %>% 
+  select(-system, -site_id)
+
+#Fish atlas data
+fish_atlas <- read_delim(paste0(getwd(), "/data_raw/Atlas_data_danish_latin_id_basin.csv"), delim = " ") %>% 
+  select(basin_id, fish_id = ID) %>% 
+  na.omit() %>% 
+  distinct() %>% 
+  left_join(dk_basins) %>% 
+  st_as_sf()
 
 #Count species richness in each basin
 fish_basin_species_count <- dk_basins %>% 
   st_join(fish_species_basin) %>% 
+  rbind(fish_atlas) %>% 
   group_by(basin_id) %>% 
-  summarise(n_spec_basin = ifelse(any(is.na(fish_id)), 0, length(unique(fish_id)))) %>%
+  summarise(n_spec_basin = ifelse(all(is.na(fish_id)), 0, length(unique(fish_id)))) %>%
   ungroup() %>% 
-  mutate(basin_area = as.numeric(st_area(GEOMETRY)))
+  mutate(basin_area = as.numeric(st_area(GEOMETRY))) %>% 
+  st_cast("MULTILINESTRING") %>% 
+  mutate(basin_circum = as.numeric(st_length(GEOMETRY))) %>% 
+  st_cast("MULTIPOLYGON")
 
 #Count number of fish caught for each sampling
 fish_lake_species_count <- fish_species_lakes %>%
   group_by(system, site_id) %>%
-  summarise(n_spec_lake = ifelse(any(is.na(fish_id)), 0, length(unique(fish_id)))) %>%
+  summarise(n_spec_lake = ifelse(all(is.na(fish_id)), 0, length(unique(fish_id)))) %>%
   ungroup()
+
+
 
 
 
@@ -58,3 +75,29 @@ library(betareg)
 mod_1 <- betareg(y.transf.betareg(lake_basin_spec_ratio) ~ basin_area_log10 + lake_area_log10 + elevation, data=model_df)
 summary(mod_1)
 
+
+
+#exp plot
+fig_hist <- model_df %>% 
+  ggplot(aes(lake_basin_spec_ratio, fill = system)) +
+  geom_histogram()
+
+fig_lake <- model_df %>% 
+  ggplot(aes(y=lake_basin_spec_ratio, x=lake_area_log10, col = system)) +
+  geom_point()+
+  ylab("andel af arter i sø ifht opland")+
+  xlab("log10 lake area")
+
+fig_basin <- model_df %>% 
+  ggplot(aes(y=lake_basin_spec_ratio, x=basin_area_log10, col = system)) +
+  geom_point()+
+  ylab("andel af arter i sø ifht opland")+
+  xlab("log10 basin area")
+
+fig_elev <- model_df %>% 
+  ggplot(aes(y=lake_basin_spec_ratio, x=elevation, col = system)) +
+  geom_point()+
+  ylab("andel af arter i sø ifht opland")+
+  xlab("sø elevation over hav")
+
+fig_hist+fig_lake+fig_basin+fig_elev+plot_layout(ncol = 2, guides = "collect")

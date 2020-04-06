@@ -9,14 +9,15 @@ source("libs_and_funcs.R")
 
 #Write vector files for further processing to gis_database
 
-#Download Denmark polygon and reproject
+#Download Denmark polygon, cut Bornholm and reproject
 dk_border_raw <- getData("GADM", country = "DNK", level = 0, path = paste0(getwd(), "/data_raw"))
 
 dk_border <- dk_border_raw %>% 
-  st_as_sf() %>% 
-  st_transform(dk_epsg)
+  st_as_sf() %>% 	
+  st_crop(xmin = 8, ymin = 54.56, xmax = 14, ymax = 57.76) %>% 	
+  st_transform(dk_epsg)	
 
-st_write(dk_border, dsn = gis_database, layer = "dk_border", delete_layer = TRUE) #, dataset_options = "SPATIALITE=YES"
+st_write(dk_border, dsn = gis_database, layer = "dk_border", delete_layer = TRUE)#, dataset_options = "SPATIALITE=YES"
 
 #Reproject and cut EU-DEM using dk_poly
 #Cut and reproject
@@ -59,7 +60,7 @@ ogr2ogr(paste0(getwd(), "/data_raw/DK_WatercourseLink.gml"),
 fish_weight_lake <- read_xlsx(paste0(getwd(), "/data_raw/", "odaforalle_fish_weight_lake.xlsx"))
 fish_net_lake <- read_xlsx(paste0(getwd(), "/data_raw/", "odaforalle_fish_net_lake.xlsx"))
 
-fish_lake_species_raw <- left_join(fish_net_lake, fish_weight_lake) %>% 
+fish_lake_species_raw <- left_join(fish_net_lake, fish_weight_lake) %>%
   mutate(system = "lake", date = ymd(Dato), year = year(date),
          Xutm_Euref89_Zone32 = as.numeric(Xutm_Euref89_Zone32), Yutm_Euref89_Zone32 = as.numeric(Yutm_Euref89_Zone32)) %>% 
   select(system, site_id = ObservationsStedNr, year,
@@ -217,6 +218,30 @@ st_write(lake_chem_sf, dsn = gis_database, layer = "lake_chem", delete_layer = T
 
 
 
+#get coordinate from first recopl_id?
+#or find lake names in miljøportalen (ends with HELE SØEN?)
 
+#Lake submerged macrophyte and mean depth data
+sv_files <- list.files(paste0(getwd(), "/data_raw/veg_data/"), full.names = TRUE)
+names(sv_files) <- str_sub(basename(sv_files), end = -5)
 
-#Lake macrophyte??
+sv_list1 <- lapply(sv_files[-c(6, 7, 11)], function(path){read_table(path, locale = locale(decimal_mark = ",", encoding = "ISO-8859-1"))})
+sv_list2 <- lapply(sv_files[c(6, 7, 11)], function(path){read_table2(path, locale = locale(decimal_mark = ",", encoding = "ISO-8859-1"))})
+sv_list <- c(sv_list1, sv_list2)
+
+#Simplificer stationer, evt zstation på miljøportal?
+#evt regprog fil??
+sv_station <- sv_list$so_cstation %>% 
+  bind_cols(select(sv_list$so_cstation2, dmu_fevoe_nr))
+
+sv_df <- sv_list$sv_bertotal %>% 
+  select(-X10) %>% 
+  left_join(select(sv_list$std_enhed, enhed_std = kode, enhed = betegn)) %>% 
+  left_join(select(sv_list$sv_berparam, param_std = kode, param = betegn)) %>% 
+  left_join(sv_list$sv_dybdeomr) %>% 
+  left_join(sv_list$sv_tilsyn2) %>% 
+  filter(dybdeomr_nr == 0 & bertype == 0) %>% 
+  select(recopl_id, startdato, resultat, enhed, param) %>% 
+  left_join()
+
+read_table2(sv_files[5], locale = locale(decimal_mark = ",", encoding = "ISO-8859-1")) %>% View()
