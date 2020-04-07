@@ -64,6 +64,10 @@ st_write(dem_basins_sf, dsn = gis_database, layer = "dk_basins", delete_layer = 
 
 
 
+
+
+
+
 #Delineate lake watersheds
 #Find lakes with fish species data
 dk_lakes <- st_read(dsn = gis_database, layer = "dk_lakes")

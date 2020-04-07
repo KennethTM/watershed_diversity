@@ -64,7 +64,7 @@ fish_lake_species_raw <- left_join(fish_net_lake, fish_weight_lake) %>%
   mutate(system = "lake", date = ymd(Dato), year = year(date),
          Xutm_Euref89_Zone32 = as.numeric(Xutm_Euref89_Zone32), Yutm_Euref89_Zone32 = as.numeric(Yutm_Euref89_Zone32)) %>% 
   select(system, site_id = ObservationsStedNr, year,
-         Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, name_local = `Dansk navn`) %>% 
+         Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, name_novana = `Dansk navn`) %>% 
   distinct() %>% 
   filter(!is.na(Xutm_Euref89_Zone32))
 
@@ -79,7 +79,7 @@ keep_na_for_zero_catch <- function(spec_col){
 }
 
 fish_lake_species <- fish_lake_species_raw %>% 
-  nest(data = c("name_local")) %>% 
+  nest(data = c("name_novana")) %>% 
   mutate(na_if_zerocatch = map(data, keep_na_for_zero_catch)) %>% 
   select(-data) %>% 
   unnest(na_if_zerocatch)
@@ -90,7 +90,7 @@ fish_stream_species <- fish_stream_raw %>%
   mutate(system = "stream", date = ymd(Dato), year = year(date),
          Xutm_Euref89_Zone32 = as.numeric(Xutm_Euref89_Zone32), Yutm_Euref89_Zone32 = as.numeric(Yutm_Euref89_Zone32)) %>% 
   select(system, site_id = ObservationsStedNr, year,
-         Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, name_local = Fiskart) %>% 
+         Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, name_novana = Fiskart) %>% 
   distinct() %>% 
   na.omit()
 
@@ -113,27 +113,38 @@ fish_newlakes_raw_zone33_to_zone32 <- fish_newlakes_raw_zone33 %>%
 
 fish_newlakes <- bind_rows(fish_newlakes_raw_zone32, fish_newlakes_raw_zone33_to_zone32) %>% 
   select(system, site_id, year_established = established,
-         Xutm_Euref89_Zone32 = x, Yutm_Euref89_Zone32 = y, name_local = Dansk_navn) %>% 
+         Xutm_Euref89_Zone32 = x, Yutm_Euref89_Zone32 = y, name_novana = Dansk_navn) %>% 
   distinct() %>% 
   mutate(year = 2018) #Avg year of sampling in new lakes
 
 fish_species <- bind_rows(fish_lake_species, fish_stream_species, fish_newlakes)
 
 #Identify fish species for further analysis
-fish_unique <- fish_species %>% distinct(name_local) %>% arrange(name_local) %>% na.omit()
-write_csv(fish_unique, paste0(getwd(), "/data_raw/", "fish_unique.csv"))
+#fish_unique <- fish_species %>% distinct(name_local) %>% arrange(name_local) %>% na.omit()
+#write_csv(fish_unique, paste0(getwd(), "/data_raw/", "fish_unique.csv"))
 
 #Select fish species for further analysis
 #Create fish species id
-fish_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/", "fish_unique_edit.xlsx")) %>% 
-  filter(keep == "y") %>% 
-  select(name_local, fish_id = ID)
+#Actions: 0=do_nothing, 1=remove_species, 2=remove_lake (brackish)
+fish_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/", "fish_unique_edit_final.xlsx")) %>% 
+  select(name = name_to_use, name_novana = name_local_novana, name_atlas = latin_and_atlas,
+         fish_id = ID, action = `how(0=do_nothing)(1=remove_species)(2=remove_lake)`) %>% 
+  select(-name_atlas)
+  
+invalid_lakes <- fish_species %>% 
+  filter(name_novana %in% filter(fish_unique_edit, action == 2)$name_novana) %>% 
+  pull(site_id) %>% 
+  unique()
 
-#Join to table with species id's, keep "y" fish and NA
+valid_fish_species <- fish_unique_edit %>% 
+  filter(action == 0 & !is.na(name_novana))
+
+#Join to table with species id's, keep valid fish species and NA
 fish_species_sub <- fish_species %>% 
-  left_join(fish_unique_edit) %>% 
-  filter(name_local %in% c(fish_unique_edit$name_local, NA)) %>% 
-  select(-name_local, -year_established)
+  left_join(valid_fish_species) %>% 
+  filter(name_novana %in% c(valid_fish_species[valid_fish_species$action == 0,]$name_novana, NA)) %>% 
+  filter(!(site_id %in% invalid_lakes)) %>% 
+  select(-name_novana, -year_established, -action)
 
 #Basin fish species pool is all species in streams and lakes found since 1990
 fish_species_basin <- fish_species_sub %>% 
@@ -159,15 +170,81 @@ fish_species_latest_survey <- fish_species_sub %>%
 
 #Lakes for further investigation
 fish_species_lakes <- fish_species_latest_survey %>% 
-  left_join(fish_species_sub, by = c("system" = "system", "site_id" = "site_id", "year_max" = "year")) %>% 
   rename(year = year_max) %>% 
+  left_join(fish_species_sub) %>% 
   distinct()
   
-#Write basin species data to gis database
-fish_species_lakes_sf <- fish_species_lakes %>% 
-  st_as_sf(coords = c("Xutm_Euref89_Zone32", "Yutm_Euref89_Zone32"), crs = dk_epsg)
+#Edit coordinates for lakes where sampling point coordinates are wrong
+lake_id_new_coord <- read_xlsx(paste0(getwd(), "/data_raw/", "Fishdata with no polygon and with multiple poly.xlsx"), sheet = 1) %>% 
+  na.omit() %>% 
+  select(-ogc_fid, -note) %>% 
+  rename(x = new_x, y = new_y) %>% 
+  add_column(system = "lake")
+
+lake_id_new_coord_zone32 <- lake_id_new_coord %>% 
+  filter(zone == 32)
+
+lake_id_new_coord_zone33_to_32 <- lake_id_new_coord %>% 
+  filter(zone == 33) %>% 
+  st_as_sf(coords=c("x", "y"), crs = dk_epsg+1) %>% 
+  st_transform(dk_epsg) %>% 
+  bind_cols(as.data.frame(st_coordinates(.))) %>% 
+  st_drop_geometry() %>% 
+  rename(x=X, y=Y)
+
+fish_species_lakes_edit <- bind_rows(lake_id_new_coord_zone32, lake_id_new_coord_zone33_to_32) %>% 
+  select(-zone) %>% 
+  right_join(fish_species_lakes) %>% 
+  mutate(Xutm_Euref89_Zone32_cor = coalesce(x, Xutm_Euref89_Zone32),
+         Yutm_Euref89_Zone32_cor = coalesce(y, Yutm_Euref89_Zone32)) %>% 
+  select(-x, -y, -Xutm_Euref89_Zone32, -Yutm_Euref89_Zone32)
+
+#Two double sampling from the same lake
+#Different sampling in same lake (Utterslev Mose)
+fish_lake_doubles <- c(c(14000045, 20000218),
+                       c(53000046, 53000047))
+
+#Write lake species data to gis database
+fish_species_lakes_sf <- fish_species_lakes_edit %>% 
+  filter(!(site_id %in% fish_lake_doubles)) %>% 
+  st_as_sf(coords = c("Xutm_Euref89_Zone32_cor", "Yutm_Euref89_Zone32_cor"), crs = dk_epsg)
 
 st_write(fish_species_lakes_sf, dsn = gis_database, layer = "fish_species_lakes", delete_layer = TRUE)
+
+#Extract lake polygon for each fish sampling
+dk_lakes <- st_read(dsn = gis_database, layer = "dk_lakes")
+fish_species_lakes <- st_read(dsn = gis_database, layer = "fish_species_lakes")
+
+#Add a missing polygon
+lillelund_engso <- st_read(paste0(getwd(), "/data_raw/","lillelund_engso.kmz")) %>% 
+  mutate(gml_id = "lillelund_engso", 
+         elevation = 0) %>% 
+  select(gml_id, elevation) %>% 
+  st_zm() %>% 
+  st_transform(dk_epsg)
+  
+
+
+
+
+#Alle fiskeundersøgelser har nu polygon
+#5 sites deler polygoner, som skal splittes!
+fish_species_lakes_polys <- fish_species_lakes %>% 
+  select(system, site_id) %>% 
+  distinct(.keep_all = TRUE) %>% 
+  st_join(rbind(dk_lakes, lillelund_engso)) %>% 
+  group_by(gml_id) %>% 
+  add_tally() %>% 
+  filter(n > 1) %>% 
+  pull(gml_id) #gml_id for polygons which contain multiple fish surveys
+
+dk_lakes %>% 
+  filter(gml_id %in% ) #split polys st_split?? remove old ones in dk_lake and insert cutted polys, finally join
+
+
+
+
+
 
 #Secchi depth data 
 lake_secchi <- read_xlsx(paste0(getwd(), "/data_raw/", "odaforalle_secchi_lake.xlsx")) %>% 
