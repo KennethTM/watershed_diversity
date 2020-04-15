@@ -3,9 +3,10 @@ source("libs_and_funcs.R")
 #Download files to data_raw folder:
 #EU-DEM v1.1 (25 m resolution)
 #Denmark polygon
-#Fish monitoring data ("Sø/Fisk/Længdevægt" and "Vandløb/Fish/Længde" dataset for lakes and streams respectively)
-#Danish lakes and streams
-#DK-DTM 10 m (later, if finer scale watershed delineation is needed)
+#Danish lakes and streams polygon/line layers
+#Fish monitoring data ("Sø/Fisk/Længdevægt" and "Vandløb/Fisk/Længde" on www.odaforalle.dk dataset for lakes and streams respectively)
+#Lake chemistry and secchi depths
+#Lake submerged macrophyte data
 
 #Write vector files for further processing to gis_database
 
@@ -211,35 +212,65 @@ fish_species_lakes_sf <- fish_species_lakes_edit %>%
 
 st_write(fish_species_lakes_sf, dsn = gis_database, layer = "fish_species_lakes", delete_layer = TRUE)
 
-#Extract lake polygon for each fish sampling
-dk_lakes <- st_read(dsn = gis_database, layer = "dk_lakes")
-fish_species_lakes <- st_read(dsn = gis_database, layer = "fish_species_lakes")
 
-#Add a missing polygon
+
+##############flyt til gis processing script?!? hvor der også gemmes subset af gis db med alle relevante data
+#Extract lake polygon for each fish sampling
+#Add a missing polygon to national lake polygon layer
 lillelund_engso <- st_read(paste0(getwd(), "/data_raw/","lillelund_engso.kmz")) %>% 
   mutate(gml_id = "lillelund_engso", 
          elevation = 0) %>% 
   select(gml_id, elevation) %>% 
   st_zm() %>% 
   st_transform(dk_epsg)
-  
 
+dk_lakes <- st_read(dsn = gis_database, layer = "dk_lakes")
+dk_lakes <- rbind(dk_lakes, lillelund_engso)
 
+fish_species_lakes <- st_read(dsn = gis_database, layer = "fish_species_lakes")
 
+#All fish sites have lakes polygons
+#Few polygons (5) contain multiple fish surveys
+#Identify, save and create cutlines in Google Earth
 
-#Alle fiskeundersøgelser har nu polygon
-#5 sites deler polygoner, som skal splittes!
+#Identify
 fish_species_lakes_polys <- fish_species_lakes %>% 
   select(system, site_id) %>% 
   distinct(.keep_all = TRUE) %>% 
-  st_join(rbind(dk_lakes, lillelund_engso)) %>% 
+  st_join(dk_lakes) %>% 
   group_by(gml_id) %>% 
   add_tally() %>% 
   filter(n > 1) %>% 
-  pull(gml_id) #gml_id for polygons which contain multiple fish surveys
+  pull(gml_id) %>% 
+  unique() #gml_id for polygons which contain multiple fish surveys
 
+#Save
 dk_lakes %>% 
-  filter(gml_id %in% ) #split polys st_split?? remove old ones in dk_lake and insert cutted polys, finally join
+  filter(gml_id %in% fish_species_lakes_polys) %>% 
+  st_write("polygons_with_multiple_fish_surveys.kml") #split polys st_split?? remove old ones in dk_lake and insert cutted polys, finally join
+
+#Read 
+fish_lake_cutlines <- st_read("fish_lake_cutlines.kmz") %>% 
+  st_zm() %>% 
+  st_transform(dk_epsg) %>% 
+  st_union() %>% 
+  st_sfc()
+
+#Cut polygons
+dk_lake_cut <- dk_lakes %>% 
+  filter(gml_id %in% fish_species_lakes_polys) %>% 
+  st_split(fish_lake_cutlines) %>% 
+  st_collection_extract(type = "POLYGON") %>% 
+  mutate(gml_id = paste0(gml_id, "_", row_number(), "_edit"))
+
+#Add to original data
+dk_lakes_edit <- dk_lakes %>% 
+  filter(!(gml_id %in% fish_species_lakes_polys)) %>% 
+  rbind(dk_lake_cut)
+
+
+
+
 
 
 
@@ -322,3 +353,19 @@ sv_df <- sv_list$sv_bertotal %>%
   left_join()
 
 read_table2(sv_files[5], locale = locale(decimal_mark = ",", encoding = "ISO-8859-1")) %>% View()
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Secchi og chem passer i stat id, overvej at join før write til database
+#fiske undersøgelser og veg data passer sammen ved station dmu nr 
+#join veg og fisk med nr og år, join fisk med secchi/chem med coordinates
