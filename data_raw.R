@@ -294,8 +294,7 @@ st_write(dk_lakes_subset, dsn = gis_database, layer = "dk_lakes_subset", delete_
 
 #Secchi depth and chemistry data
 #lake id's in secchi and chemistry data do not match that of fish data
-lake_secchi_raw <- read_xlsx(paste0(getwd(), "/data_raw/", "odaforalle_secchi_lake.xlsx")) %>% 
-  select()
+lake_secchi_raw <- read_xlsx(paste0(getwd(), "/data_raw/", "odaforalle_secchi_lake.xlsx"))
 lake_chem_raw <- read_xlsx(paste0(getwd(), "/data_raw/", "odaforalle_chemistry_lake.xlsx"))
 
 #Combine data, average across depth and calculate weighted mean across year
@@ -307,9 +306,9 @@ lake_secchi_chem <- bind_rows(lake_chem_raw, lake_secchi_raw) %>%
          var_unit = paste0(Parameter_cor, "_", Enhed),
          avg_sample_depth_m_chem = parse_number(`GennemsnitsDybde i m`, locale = locale(decimal_mark = ",")),
          avg_sample_depth_m = ifelse(is.na(avg_sample_depth_m_chem), 0, avg_sample_depth_m_chem)) %>% 
-  select(system, site_id_2 = ObservationsStedNr, date, year, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, 
+  select(system, name = ObservationsStedNavn, site_id_2 = ObservationsStedNr, date, year, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, 
          avg_sample_depth_m, var_unit, value = Resultat) %>% 
-  group_by(system, site_id_2, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, year, var_unit, date) %>% 
+  group_by(system, name, site_id_2, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, year, var_unit, date) %>% 
   summarise(value_mean = mean(value)) %>% 
   spread(var_unit, value_mean) %>% 
   rename(alk_mmol_l = `Alkalinitet,total TA_mmol/l`, chla_ug_l = `Chlorophyl A_µg/l`, tn_mg_l = `Nitrogen,total N_mg/l`, 
@@ -322,13 +321,19 @@ lake_secchi_chem <- bind_rows(lake_chem_raw, lake_secchi_raw) %>%
          between(ph_ph, 2, 12),
          Yutm_Euref89_Zone32 > 700000,
          year >= 2006) %>% 
-  group_by(system, site_id_2, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, year) %>% 
+  group_by(system, name, site_id_2, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, year) %>% 
   summarise_at(vars(alk_mmol_l, chla_ug_l, tn_mg_l, ph_ph, tp_mg_l, secchi_depth_m),
                ~weighted.mean(., w = yday(date))) %>%
   ungroup() 
 
 lake_secchi_chem_sf <- lake_secchi_chem %>% 
   st_as_sf(coords = c("Xutm_Euref89_Zone32", "Yutm_Euref89_Zone32"), crs = dk_epsg)
+
+#Write raw secchi_chem stations to .sqlite file and align coordinates
+# lake_secchi_chem_sf %>%
+#   select(site_id_2, name) %>%
+#   distinct(.keep_all = TRUE) %>%
+#   st_write(paste0(getwd(), "/data_raw/lake_secchi_chem_raw.sqlite"), delete_dsn = TRUE)
 
 st_write(lake_secchi_chem_sf, dsn = gis_database, layer = "lake_secchi_chem", delete_layer = TRUE)
 
@@ -354,11 +359,11 @@ lake_plants_raw <- sv_list$sv_bertotal %>%
          param_unit = paste0(param, "_", enhed)) %>% 
   select(system, recopl_id, year, dybdeomr_id, resultat, param_unit) %>% 
   spread(param_unit, resultat) %>% 
-  left_join(select(sv_list$so_cstation3, recopl_id, utm_zone, utm_x, utm_y))
+  left_join(select(sv_list$so_cstation3, navn, recopl_id, utm_zone, utm_x, utm_y))
 
 lake_plants <- lake_plants_raw %>% 
   mutate(zmean_m = Søvolumen_m3/Søreal_m2) %>% 
-  select(system, year, site_id_3 = recopl_id, utm_zone, utm_x, utm_y, area_m2 = Søreal_m2,
+  select(system, year, site_id_3 = recopl_id, name = navn, utm_zone, utm_x, utm_y, area_m2 = Søreal_m2,
          zmean_m, volume_m3 = Søvolumen_m3, mean_plant_height_m = `Middel plantehøjde_m`,
          plant_area_m2 = `Plantedækket areal_m2`, plant_vol_m3 = `Plantefyldt volumen_m3`,
          plant_area_perc = `Relativ plantedækket areal_pct.`, plant_vol_perc = `Relativ plantefyldt volumen_pct.`) %>% 
@@ -382,5 +387,10 @@ lake_plants_sf <- bind_rows(lake_plants_zone32, lake_plants_zone33_to_32) %>%
   filter(between(utm_x, 4*10^5, 9*10^5),
          between(utm_y, 6010000, 6400000)) %>% 
   st_as_sf(coords = c("utm_x", "utm_y"), crs = dk_epsg)
+
+# lake_plants_sf %>%
+#   select(site_id_3, name) %>%
+#   distinct(.keep_all = TRUE) %>%
+#   st_write(paste0(getwd(), "/data_raw/lake_plants_raw.sqlite"), delete_dsn = TRUE)
 
 st_write(lake_plants_sf, dsn = gis_database, layer = "lake_plants", delete_layer = TRUE)
