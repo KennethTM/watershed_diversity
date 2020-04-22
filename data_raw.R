@@ -63,9 +63,10 @@ fish_net_lake <- read_xlsx(paste0(getwd(), "/data_raw/", "odaforalle_fish_net_la
 
 fish_lake_species_raw <- left_join(fish_net_lake, fish_weight_lake) %>%
   mutate(system = "lake", date = ymd(Dato), year = year(date),
-         Xutm_Euref89_Zone32 = as.numeric(Xutm_Euref89_Zone32), Yutm_Euref89_Zone32 = as.numeric(Yutm_Euref89_Zone32)) %>% 
+         Xutm_Euref89_Zone32 = as.numeric(Xutm_Euref89_Zone32), Yutm_Euref89_Zone32 = as.numeric(Yutm_Euref89_Zone32),
+         name_novana = gsub(" ", "_", `Dansk navn`)) %>% 
   select(system, site_id = ObservationsStedNr, year,
-         Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, name_novana = `Dansk navn`) %>% 
+         Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, name_novana) %>% 
   distinct() %>% 
   filter(!is.na(Xutm_Euref89_Zone32))
 
@@ -89,14 +90,21 @@ fish_lake_species <- fish_lake_species_raw %>%
 fish_stream_raw <- read_xlsx(paste0(getwd(), "/data_raw/", "odaforalle_fish_stream.xlsx"))
 fish_stream_species <- fish_stream_raw %>% 
   mutate(system = "stream", date = ymd(Dato), year = year(date),
-         Xutm_Euref89_Zone32 = as.numeric(Xutm_Euref89_Zone32), Yutm_Euref89_Zone32 = as.numeric(Yutm_Euref89_Zone32)) %>% 
+         Xutm_Euref89_Zone32 = as.numeric(Xutm_Euref89_Zone32), 
+         Yutm_Euref89_Zone32 = as.numeric(Yutm_Euref89_Zone32),
+         name_novana = gsub(" ", "_", Fiskart)) %>% 
   select(system, site_id = ObservationsStedNr, year,
-         Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, name_novana = Fiskart) %>% 
+         Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, name_novana) %>% 
   distinct() %>% 
   na.omit()
 
 #Fish in new lakes
-fish_newlakes_raw <- read_xlsx(paste0(getwd(), "/data_raw/", "Samlet arter nye søer.xlsx")) %>% 
+fish_newlakes_sheet1 <- read_xlsx(paste0(getwd(), "/data_raw/", "Samlet arter nye søer inkl kemi.xlsx"), sheet = 1)
+fish_newlakes_sheet3 <- read_xlsx(paste0(getwd(), "/data_raw/", "Samlet arter nye søer inkl kemi.xlsx"), sheet = 3) %>% 
+  select(-x, -y, -`UTM zone`) %>% 
+  rename(Lokalitetsnavn = sø)
+
+fish_newlakes_raw <- left_join(fish_newlakes_sheet1, fish_newlakes_sheet3) %>% 
   mutate(system = "newlake", site_id = group_indices(., Lokalitetsnavn))
   
 fish_newlakes_raw_zone32 <- fish_newlakes_raw %>% 
@@ -112,7 +120,14 @@ fish_newlakes_raw_zone33_to_zone32 <- fish_newlakes_raw_zone33 %>%
   st_drop_geometry() %>% 
   rename(x=X, y=Y)
 
-fish_newlakes <- bind_rows(fish_newlakes_raw_zone32, fish_newlakes_raw_zone33_to_zone32) %>% 
+fish_and_chem_newlakes <- bind_rows(fish_newlakes_raw_zone32, fish_newlakes_raw_zone33_to_zone32) 
+
+chem_newlakes <- fish_and_chem_newlakes %>% 
+  select(system, site_id, established, secchi_depth_m:tn_mg_l) %>% 
+  distinct()
+saveRDS(chem_newlakes, paste0(getwd(), "/data_raw/chem_newlakes.rds"))
+
+fish_newlakes <- fish_and_chem_newlakes %>% 
   select(system, site_id, year_established = established,
          Xutm_Euref89_Zone32 = x, Yutm_Euref89_Zone32 = y, name_novana = Dansk_navn) %>% 
   distinct() %>% 
@@ -133,20 +148,21 @@ fish_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/", "fish_unique_edit_fi
   select(name = name_to_use, name_novana = name_local_novana, name_atlas = latin_and_atlas,
          fish_id = ID, action = `how(0=do_nothing)(1=remove_species)(2=remove_lake)`) %>% 
   select(-name_atlas)
-  
+
 invalid_lakes <- fish_species %>% 
   filter(name_novana %in% filter(fish_unique_edit, action == 2)$name_novana) %>% 
   pull(site_id) %>% 
   unique()
 
 valid_fish_species <- fish_unique_edit %>% 
-  filter(action == 0 & !is.na(name_novana))
+  filter(action == 0 & !is.na(name)) %>% 
+  na.omit()
 
 #Join to table with species id's, keep valid fish species and NA
 fish_species_sub <- fish_species %>% 
-  left_join(valid_fish_species) %>% 
-  filter(name_novana %in% c(valid_fish_species[valid_fish_species$action == 0,]$name_novana, NA)) %>% 
   filter(!(site_id %in% invalid_lakes)) %>% 
+  left_join(valid_fish_species) %>%
+  filter(action == 0 | is.na(name_novana)) %>% 
   select(-name_novana, -year_established, -action)
 
 #Basin fish species pool is all species in streams and lakes found since 1990
@@ -297,7 +313,7 @@ st_write(dk_lakes_subset, dsn = gis_database, layer = "dk_lakes_subset", delete_
 lake_secchi_raw <- read_xlsx(paste0(getwd(), "/data_raw/", "odaforalle_secchi_lake.xlsx"))
 lake_chem_raw <- read_xlsx(paste0(getwd(), "/data_raw/", "odaforalle_chemistry_lake.xlsx"))
 
-#Combine data, average across depth and calculate weighted mean across year
+#Combine data, average across depth and calculate mean across year
 lake_secchi_chem <- bind_rows(lake_chem_raw, lake_secchi_raw) %>% 
   mutate(system = "lake", date = ymd(Startdato), year = year(date),
          Xutm_Euref89_Zone32 = as.numeric(coalesce(Xutm_Euref89_Zone32, Xutm_Euref89_Zone32_ZONE32)), 
@@ -322,8 +338,7 @@ lake_secchi_chem <- bind_rows(lake_chem_raw, lake_secchi_raw) %>%
          Yutm_Euref89_Zone32 > 700000,
          year >= 2006) %>% 
   group_by(system, name, site_id_2, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, year) %>% 
-  summarise_at(vars(alk_mmol_l, chla_ug_l, tn_mg_l, ph_ph, tp_mg_l, secchi_depth_m),
-               ~weighted.mean(., w = yday(date))) %>%
+  summarise_at(vars(alk_mmol_l, chla_ug_l, tn_mg_l, ph_ph, tp_mg_l, secchi_depth_m), list(mean)) %>%
   ungroup() 
 
 lake_secchi_chem_sf <- lake_secchi_chem %>% 
@@ -394,3 +409,19 @@ lake_plants_sf <- bind_rows(lake_plants_zone32, lake_plants_zone33_to_32) %>%
 #   st_write(paste0(getwd(), "/data_raw/lake_plants_raw.sqlite"), delete_dsn = TRUE)
 
 st_write(lake_plants_sf, dsn = gis_database, layer = "lake_plants", delete_layer = TRUE)
+
+#lake_plants and lake_secchi_chem exported as raw .sqlite files and edited by EK so lake stations align with lake_subset
+#Write the edited files to database
+ogr2ogr(paste0(getwd(), "/data_raw/lake_secchi_chem_raw_EK_Fixed.sqlite"),
+        gis_database,
+        nln = "lake_secchi_chem_edit",
+        update = TRUE,
+        overwrite = TRUE,
+        a_srs = paste0("EPSG:", dk_epsg))
+
+ogr2ogr(paste0(getwd(), "/data_raw/lake_plants_raw_EK_Fixed.sqlite"),
+        gis_database,
+        nln = "lake_plants_edit",
+        update = TRUE,
+        overwrite = TRUE,
+        a_srs = paste0("EPSG:", dk_epsg))
