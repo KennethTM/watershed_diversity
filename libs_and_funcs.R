@@ -7,4 +7,11 @@ dk_epsg <- 25832
 #Path for spatial vector database
 gis_database <- paste0(getwd(), "/data_processed/gis_database.sqlite")
 
-theme_set(theme_bw())
+#Figure sizing. For most journals the figures should be 39 mm, 84 mm, 129 mm, or 174 mm wide and not higher than 234 mm.
+#ggplot theme
+theme_pub <- theme_bw() + 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        axis.text = element_text(colour = "black"), 
+        strip.background = element_rect(fill = "white"))
+theme_set(theme_pub)
