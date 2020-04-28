@@ -41,6 +41,7 @@ dk_lakes_subset <- st_read(dsn = gis_database, layer = "dk_lakes_subset") %>%
 chem_newlakes <- readRDS(paste0(getwd(), "/data_raw/chem_newlakes.rds")) %>% 
   rename(secchi_depth_m_1 = secchi_depth_m, pH_pH_1 = pH_pH, alk_meq_l_1 = alk_meq_l,
          chla_ug_l_1 = chla_ug_l, tp_mg_l_1 = tp_mg_l, tn_mg_l_1 = tn_mg_l)
+
 new_lakes_age <- read_xlsx(paste0(getwd(), "/data_raw/new_lakes_age.xlsx")) %>% 
   rename(established_lars = year) %>% 
   na.omit() %>% 
@@ -121,8 +122,8 @@ all_model_data <- fish_lake_species_count %>%
          tp_mg_l = coalesce(tp_mg_l_1, tp_mg_l_2),
          tn_mg_l_1 = coalesce(tn_mg_l_1, tn_mg_l_2)) %>% 
   select(-contains("_1"), -contains("_2"),-established, -established_lars) %>% 
-  mutate(lake_basin_area_ratio = lake_area_m2/basin_area_m2,
-         lake_basin_spec_ratio = n_spec_lake/n_spec_basin,
+  mutate(spec_proportion = n_spec_lake/n_spec_basin,
+         lake_basin_area_ratio = lake_area_m2/basin_area_m2,
          basin_area_log10 = log10(basin_area_m2),
          lake_area_log10 = log10(lake_area_m2),
          basin_circum_log10 = log10(basin_circum_m),
@@ -131,10 +132,9 @@ all_model_data <- fish_lake_species_count %>%
          basin_id_fact = factor(basin_id)) %>% 
   st_crop(st_bbox(dk_border))
 
-#Write data to .rds file
+#Write data for modeling to .rds file
 saveRDS(all_model_data, paste0(getwd(), "/data_processed/all_model_data.rds"))
 
 #Save list with data for figures
-fig_data <- list(fish_basin_species_count, all_model_data, dk_basins) #dk_border missing
-saveRDS(fig_data, paste0(getwd(), "/figures/fig_data.rds"))
-
+fig_data <- list(fish_basin_species_count, all_model_data, dk_basins, dk_border)
+saveRDS(fig_data, paste0(getwd(), "/figures/fig_gis_data.rds"))

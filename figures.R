@@ -1,11 +1,11 @@
 source("libs_and_funcs.R")
 
 #Data for figures
-fig_data <- readRDS(paste0(getwd(), "/figures/fig_data.rds"))
-#dk_border <- st_read(dsn = gis_database, layer = "dk_border") 
+fig_data <- readRDS(paste0(getwd(), "/figures/fig_gis_data.rds"))
 fish_basin_species_count  <- fig_data[[1]]
 all_model_data  <- fig_data[[2]]
 dk_basins <- fig_data[[3]]
+dk_border <- fig_data[[4]]
 
 #Basin richness
 basin_richness_freq <- fish_basin_species_count %>% 
