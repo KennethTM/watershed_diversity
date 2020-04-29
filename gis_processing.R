@@ -22,20 +22,31 @@ dk_basins <- st_read(dsn = gis_database, layer = "dk_basins") %>%
   mutate(basin_area_m2 = as.numeric(st_area(GEOMETRY)),
          basin_circum_m = as.numeric(st_length(st_cast(GEOMETRY, "MULTILINESTRING"))))
 
-#Only do calc for watersheds overlapping lake subset, consider using centroid for now
-# dk_basins_watercover <- dk_basins %>% 
-#   st_join(select(dk_streams, stream_length_m)) %>% 
-#   st_join(select(dk_lakes, lake_area_m2)) %>% 
-#   st_drop_geometry() %>% 
-#   group_by(basin_id) %>% 
-#   summarise(sum_stream_length_m = sum(stream_length_m),
-#             sum_lake_area_m2 = sum(lake_area_m2))
-  
 dk_lakes_subset <- st_read(dsn = gis_database, layer = "dk_lakes_subset") %>% 
   mutate(lake_area_m2 = as.numeric(st_area(GEOMETRY)),
          lake_circum_m = as.numeric(st_length(st_cast(GEOMETRY, "MULTILINESTRING"))),
          lake_dev_ind = lake_circum_m/(2*sqrt(pi*lake_area_m2)),
-         lake_stream_connect = lengths(st_intersects(st_buffer(GEOMETRY, 2), dk_streams)))
+         lake_stream_connect = lengths(st_intersects(GEOMETRY, dk_streams)))
+
+#Compute stream length and lake area in basin
+#Using centroids for now
+dk_streams_centroid <- st_centroid(select(dk_streams, stream_length_m))
+
+dk_lakes_centroid <- st_centroid(select(dk_lakes, lake_area_m2))
+
+dk_basins_lake_area <- dk_basins %>%
+  st_join(dk_lakes_centroid) %>%
+  st_drop_geometry() %>% 
+  select(basin_id, lake_area_m2) %>% 
+  group_by(basin_id) %>% 
+  summarise(sum_lake_area_m2 = sum(lake_area_m2))
+
+dk_basins_stream_length <- dk_basins %>%
+  st_join(dk_streams_centroid) %>%
+  st_drop_geometry() %>% 
+  select(basin_id, stream_length_m) %>% 
+  group_by(basin_id) %>% 
+  summarise(sum_stream_length_m = sum(stream_length_m))
 
 #Read newlakes data and age of other new/re-established lakes
 chem_newlakes <- readRDS(paste0(getwd(), "/data_raw/chem_newlakes.rds")) %>% 
@@ -71,7 +82,9 @@ fish_monitoring <- fish_species_basin %>%
 fish_basin_species_count <- bind_rows(fish_atlas, fish_monitoring) %>% 
   group_by(basin_id) %>% 
   summarise(n_spec_basin = ifelse(all(is.na(fish_id)), 0, length(unique(fish_id)))) %>% 
-  left_join(dk_basins) %>% 
+  left_join(dk_basins) %>%   
+  left_join(dk_basins_stream_length) %>% 
+  left_join(dk_basins_lake_area) %>% 
   st_as_sf()
 
 #Count species richness in each lakes
@@ -113,7 +126,6 @@ all_model_data <- fish_lake_species_count %>%
   left_join(df_secchi_chem) %>% 
   left_join(df_plants) %>% 
   left_join(chem_newlakes) %>% 
-  #left_join(dk_basins_watercover) %>% 
   mutate(year_established = coalesce(established, established_lars),
          secchi_depth_m = coalesce(secchi_depth_m_1, secchi_depth_m_2),
          pH_pH = coalesce(pH_pH_1, ph_ph_2),
@@ -129,7 +141,9 @@ all_model_data <- fish_lake_species_count %>%
          basin_circum_log10 = log10(basin_circum_m),
          lake_circum_log10 = log10(lake_circum_m),
          lake_stream_connect_binary = factor(ifelse(lake_stream_connect == 0, 0, 1)),
-         basin_id_fact = factor(basin_id)) %>% 
+         basin_id_fact = factor(basin_id),
+         sum_lake_area_m2 = ifelse(is.na(sum_lake_area_m2), 0, sum_lake_area_m2),
+         sum_stream_length_m = ifelse(is.na(sum_stream_length_m), 0, sum_stream_length_m)) %>% 
   st_crop(st_bbox(dk_border))
 
 #Write data for modeling to .rds file

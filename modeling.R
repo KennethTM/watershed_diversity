@@ -8,10 +8,12 @@ summary(all_model_data)
 model_df <- all_model_data %>% 
   st_drop_geometry() %>% 
   filter(!is.na(basin_id)) %>% 
+  #mutate(nat_or_new = factor(ifelse(is.na(year_established) | (year-year_established) > 5, 1, 0))) %>% 
+  #mutate(lake_age_bin = ifelse(is.na(year_established), "unknown", cut(year-year_established, c(0, 10, 20,100), include.lowest=TRUE))) %>% 
   select(-year_established, -year, -gml_id, -n_spec_lake, -system, -site_id, -basin_id, -lake_stream_connect) %>% 
   select(-lake_area_m2, -lake_circum_m, -basin_area_m2, -basin_circum_m,
          -lake_circum_log10, -basin_circum_log10,
-         -plant_vol_perc, -dist_to_sea_m)
+         -plant_vol_perc, -dist_to_sea_m, -sum_stream_length_m, -sum_lake_area_m2)
 
 #Examine correlations
 cont_preds <- model_df %>% 
@@ -22,12 +24,10 @@ corrplot.mixed(cond_preds_cor)
 
 #Calculate variance inflation factors (VIF) (Zuur MEE 2009)
 #Drop variables such that maximum VIF is not higher than 3 
-source("HighstatLib.r")
-
 corvif(cont_preds)
 
 #Binomial model
-model_df_scale<- cont_preds %>% 
+model_df_scale <- cont_preds %>% 
   mutate_all(list(scale)) %>% 
   bind_cols(select(model_df, basin_id_fact, lake_stream_connect_binary, n_spec_basin, spec_proportion)) %>% 
   select(-plant_area_perc, -zmean_m) %>% #Removed as it is not important
@@ -77,7 +77,7 @@ overdisp_fun <- function(model) {
 
 overdisp_fun(glmm_0)
 
-#Backward elimination of variables untill all terms are significant
+#Backwards elimination of variables untill all terms are significant
 drop1(glmm_0, test = "Chisq")
 glmm_1 <- update(glmm_0, . ~ . -lake_dev_ind)
 
@@ -95,67 +95,112 @@ glmm_5 <- update(glmm_4, . ~ . -tp_mg_l)
 
 drop1(glmm_5, test = "Chisq")
 
+#include squared terms
+glmm_6 <- update(glmm_5, . ~ . + I(pH_pH^2)+I(lake_area_log10^2)-alk_meq_l) 
+drop1(glmm_6, test = "Chisq")
+
+#calculate goodness of fit
+# glm_6 <- glm(spec_proportion ~ elevation + pH_pH + basin_area_log10 + lake_area_log10 +  
+#                lake_stream_connect_binary + I(pH_pH^2) + I(lake_area_log10^2),
+#                   weights=n_spec_basin, 
+#                   data=model_df_scale, 
+#                   family="binomial")
+# 
+# library(piecewiseSEM)
+# rsquared(glm_6)
+
+r.squaredGLMM(glmm_6)
+
+r2.corr.mer <- function(m){
+  lmfit <-  lm(model.response(model.frame(m)) ~ fitted(m))
+  summary(lmfit)$r.squared
+}
+r2.corr.mer(glmm_6)
+
 #Validate model
-plot(glmm_5)
+plot(glmm_6)
 
-conf_intervals <- confint(glmm_5, method = "profile")
+conf_intervals <- confint(glmm_6, method = "profile")
 
-deviance(glmm_5)/df.residual(glmm_5) 
+deviance(glmm_6)/df.residual(glmm_6) 
 
 #Plots
-preds <- ggpredict(glmm_5, terms = "alk_meq_l")
-plot(preds)
-
-
-
-
-
-#include squared terms
-tmp <- update(glmm_5, . ~ . + I(pH_pH^2)+I(lake_area_log10^2)-alk_meq_l) #lake_area^2 improves model, problematic with both alk and ph
-drop1(tmp, test = "Chisq")
-
-
-
-
-
-
-
-ph <- ggeffect(tmp, terms = "pH_pH [all]")
-elev <- ggeffect(tmp, terms = "elevation [all]")
-basin_area <- ggeffect(tmp, terms = "basin_area_log10 [all]")
-lake_area <- ggeffect(tmp, terms = "lake_area_log10 [all]")
-connect <- ggeffect(tmp, terms = "lake_stream_connect_binary")
+ph <- ggeffect(glmm_6, terms = "pH_pH [all]")
+elev <- ggeffect(glmm_6, terms = "elevation [all]")
+basin_area <- ggeffect(glmm_6, terms = "basin_area_log10 [all]")
+lake_area <- ggeffect(glmm_6, terms = "lake_area_log10 [all]")
+connect <- ggeffect(glmm_6, terms = "lake_stream_connect_binary")
 
 ph_plot <- ggplot(data = tbl_df(ph), aes(x, predicted)) +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), fill = "coral")+
   geom_line() +
   geom_point(data = model_df_scale, aes(pH_pH, spec_proportion), alpha = 0.2)+
-  xlab("pH")
+  xlab("pH")+
+  ylab("Richness")
 
 elev_plot <- ggplot(data = tbl_df(elev), aes(x, predicted)) +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), fill = "coral")+
   geom_line() +
   geom_point(data = model_df_scale, aes(elevation, spec_proportion), alpha = 0.2)+
-  xlab("Elevation")
+  xlab("Elevation")+
+  ylab("Richness")
 
 basin_area_plot <- ggplot(data = tbl_df(basin_area), aes(x, predicted)) +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), fill = "coral")+
   geom_line() +
   geom_point(data = model_df_scale, aes(basin_area_log10, spec_proportion), alpha = 0.2)+
-  xlab("Basin area")
+  xlab("Basin area")+
+  ylab("Richness")
 
 lake_area_plot <- ggplot(data = tbl_df(lake_area), aes(x, predicted)) +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), fill = "coral")+
   geom_line() +
   geom_point(data = model_df_scale, aes(lake_area_log10, spec_proportion), alpha = 0.2)+
-  xlab("Lake area")
+  xlab("Lake area")+
+  ylab("Richness")
 
 connect_plot <- ggplot(data = tbl_df(connect), aes(x, predicted)) +
   geom_linerange(aes(x = x, ymin = conf.low, ymax = conf.high), col = "coral", size = 2)+
   geom_point(aes(y=predicted))+
-  geom_jitter(data = model_df_scale, aes(lake_stream_connect_binary, spec_proportion), alpha = 0.2)+
-  xlab("Stream connect")
+  geom_jitter(data = model_df_scale, aes(lake_stream_connect_binary, spec_proportion), alpha = 0.2,width = 0.25)+
+  xlab("Stream connect")+
+  ylab("Richness")
 
-glmer_plot <- ph_plot+elev_plot+basin_area_plot+lake_area_plot+connect_plot+plot_layout(ncol = 2)
+obs_pred_plot <- model_df_scale %>% 
+  mutate(fitted_values = fitted(glmm_6)) %>% 
+  ggplot(aes(fitted_values, spec_proportion)) +
+  geom_abline(slope=1, intercept = 0, linetype = 2)+
+  geom_point(alpha=0.2)+
+  ylim(0, 1)+
+  xlim(0, 1)+
+  ylab("Observed richness")+
+  xlab("Predicted richness")
+
+glmer_plot <- ph_plot+elev_plot+basin_area_plot+lake_area_plot+connect_plot+obs_pred_plot+plot_layout(ncol = 2)
 
 ggsave(paste0(getwd(), "/figures/glmer_plot.png"), glmer_plot, units = "mm", width = 174, height = 200)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+library(mgcv)
+
+tmp2 <- gam(spec_proportion ~ s(elevation) + s(pH_pH) + s(basin_area_log10) + s(lake_area_log10) + lake_stream_connect_binary,
+            weights=n_spec_basin, 
+            data=model_df_scale, 
+            family="binomial") 
+
+anova(tmp2)
+summary(tmp2)
+plot(tmp2)
