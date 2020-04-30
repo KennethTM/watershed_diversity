@@ -13,7 +13,7 @@ basin_richness_freq <- fish_basin_species_count %>%
   ggplot(aes(n_spec_basin))+
   geom_histogram(fill = NA, col = "black")+
   ylab("Frequency")+
-  xlab("Basin area (km2)")
+  xlab("Basin richness")
 
 basin_richness_map <- dk_basins %>% 
   left_join(st_drop_geometry(select(fish_basin_species_count, basin_id, n_spec_basin))) %>% 

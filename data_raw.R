@@ -65,7 +65,7 @@ fish_lake_species_raw <- left_join(fish_net_lake, fish_weight_lake) %>%
   mutate(system = "lake", date = ymd(Dato), year = year(date),
          Xutm_Euref89_Zone32 = as.numeric(Xutm_Euref89_Zone32), Yutm_Euref89_Zone32 = as.numeric(Yutm_Euref89_Zone32),
          name_novana = gsub(" ", "_", `Dansk navn`)) %>% 
-  select(system, site_id = ObservationsStedNr, year,
+  select(system, site_id = ObservationsStedNr, lake_name = ObservationsStedNavn, year,
          Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, name_novana) %>% 
   distinct() %>% 
   filter(!is.na(Xutm_Euref89_Zone32))
@@ -120,7 +120,8 @@ fish_newlakes_raw_zone33_to_zone32 <- fish_newlakes_raw_zone33 %>%
   st_drop_geometry() %>% 
   rename(x=X, y=Y)
 
-fish_and_chem_newlakes <- bind_rows(fish_newlakes_raw_zone32, fish_newlakes_raw_zone33_to_zone32) 
+fish_and_chem_newlakes <- bind_rows(fish_newlakes_raw_zone32, fish_newlakes_raw_zone33_to_zone32) %>% 
+  rename(lake_name = Lokalitetsnavn)
 
 chem_newlakes <- fish_and_chem_newlakes %>% 
   select(system, site_id, established, secchi_depth_m:tn_mg_l) %>% 
@@ -128,12 +129,19 @@ chem_newlakes <- fish_and_chem_newlakes %>%
 saveRDS(chem_newlakes, paste0(getwd(), "/data_raw/chem_newlakes.rds"))
 
 fish_newlakes <- fish_and_chem_newlakes %>% 
-  select(system, site_id, year_established = established,
+  select(system, site_id, lake_name, year_established = established,
          Xutm_Euref89_Zone32 = x, Yutm_Euref89_Zone32 = y, name_novana = Dansk_navn) %>% 
   distinct() %>% 
   mutate(year = 2018) #Avg year of sampling in new lakes
 
-fish_species <- bind_rows(fish_lake_species, fish_stream_species, fish_newlakes)
+fish_species <- bind_rows(fish_lake_species, fish_stream_species, fish_newlakes) %>% 
+  select(-lake_name)
+
+#Save list with lake names
+# bind_rows(fish_lake_species, fish_newlakes) %>% 
+#   select(system, site_id, lake_name) %>% 
+#   distinct() %>% 
+#   saveRDS(paste0(getwd(), "/data_raw/lake_names.rds"))
 
 #Identify fish species for further analysis
 #Valid/invalid fish species are edited manually and fish_id columns are added 
@@ -240,7 +248,7 @@ dk_lakes %>%
   st_write(paste0(getwd(), "/data_raw/polygons_with_multiple_fish_surveys.kml"), delete_dsn = TRUE) 
 
 #Add also a missing polygon to national lake polygon layer (OpenStreetMap)
-lillelund_engso <- st_read(paste0(getwd(), "/data_raw/","lillelund_engso.kmz")) %>% 
+lillelund_engso <- st_read(paste0(getwd(), "/data_raw/lillelund_engso.kmz")) %>% 
   mutate(gml_id = "lillelund_engso", 
          elevation = 0) %>% 
   select(gml_id, elevation) %>% 
