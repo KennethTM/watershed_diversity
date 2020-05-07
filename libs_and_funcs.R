@@ -73,3 +73,14 @@ corvif <- function(dataz) {
   cat("\n\nVariance inflation factors\n\n")
   print(myvif(lm_mod))
 }
+
+#function for counting fish species caught per sampling, if na no fish caught but keep point
+keep_na_for_zero_catch <- function(spec_col){
+  if(all(is.na(spec_col[[1]]))){
+    df <- tibble(col_name = NA)
+    names(df) <- names(spec_col)
+    return(df)
+  }else{
+    return(na.omit(spec_col))
+  }
+}

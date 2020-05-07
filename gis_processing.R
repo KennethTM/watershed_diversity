@@ -95,16 +95,23 @@ fish_lake_species_count <- fish_species_lakes %>%
 
 #Merge plant data and secchi_chem data
 #Join secchi_chem and plants to lake polys
+
+#One lake (Tryggelev Nor) with wrong site_id_2
+#remove "wrong" site_id_2, and replace "right" with "wrong"
+lake_secchi_chem_cor <- lake_secchi_chem %>% 
+  st_drop_geometry() %>% 
+  filter(!(site_id_2 == 47000318)) %>% 
+  mutate(site_id_2 = ifelse(site_id_2 == 47000020, 47000318, site_id_2))
+
 df_secchi_chem <- dk_lakes_subset %>%
   st_join(select(fish_lake_species_count, system, site_id, year)) %>%
   st_join(lake_secchi_chem_edit) %>%
   st_drop_geometry() %>%
-  left_join(st_drop_geometry(lake_secchi_chem)) %>% 
+  left_join(lake_secchi_chem_cor) %>% 
   select(gml_id, year, alk_meq_l_2 = alk_mmol_l, chla_ug_l_2 = chla_ug_l, tn_mg_l_2 =tn_mg_l, 
          ph_ph_2 = ph_ph, tp_mg_l_2 = tp_mg_l, secchi_depth_m_2 = secchi_depth_m) %>% 
-  na.omit() %>% 
   group_by(gml_id, year) %>% 
-  summarise_all(list(mean)) %>% 
+  summarise_all(list(mean), na.rm = TRUE) %>% 
   ungroup()
 
 df_plants <- dk_lakes_subset %>%
@@ -112,15 +119,27 @@ df_plants <- dk_lakes_subset %>%
   st_join(lake_plants_edit) %>%
   st_drop_geometry() %>%
   left_join(st_drop_geometry(lake_plants)) %>% 
-  select(gml_id, year, zmean_m, plant_area_perc, plant_vol_perc) %>% 
-  na.omit() %>% 
+  select(gml_id, year, zmean_m, zmax_m = max_depth_m, plant_area_perc, plant_vol_perc) %>%
   group_by(gml_id, year) %>% 
-  summarise_all(list(mean)) %>% 
+  summarise_all(list(mean), na.rm = TRUE) %>% 
   ungroup()
+
+#Assign lake just outside a basin to the nearby basin
+#No basin intersecting 5 lakes because of low (0 or below) elevation in the elevation model
+basin_id_cor <- tribble(~system, ~site_id, ~basin_id_cor,
+                        #"lake", 9000212, , Lønnerup Fjord
+                        #"lake", 47000195, , udenfor opland  Keldsnor, Langeland
+                        #"lake", 54000038, 1513, sø uden fisk i opland uden fisk
+                        "newlake", 15, 1723,
+                        "newlake", 20, 1258)
 
 #Merge data
 all_model_data <- fish_lake_species_count %>% 
-  st_join(fish_basin_species_count) %>% 
+  st_join(select(fish_basin_species_count, basin_id)) %>% 
+  left_join(basin_id_cor) %>% 
+  mutate(basin_id = coalesce(basin_id, basin_id_cor)) %>% 
+  select(-basin_id_cor) %>% 
+  left_join(st_drop_geometry(fish_basin_species_count)) %>% 
   st_join(select(dk_lakes_subset_age_dist, -elevation, -gml_id, -site)) %>% 
   left_join(select(chem_newlakes, system, site_id, established)) %>% 
   left_join(df_secchi_chem) %>% 
@@ -132,7 +151,7 @@ all_model_data <- fish_lake_species_count %>%
          alk_meq_l = coalesce(alk_meq_l_1, alk_meq_l_2),
          chla_ug_l = coalesce(chla_ug_l_1, chla_ug_l_2),
          tp_mg_l = coalesce(tp_mg_l_1, tp_mg_l_2),
-         tn_mg_l_1 = coalesce(tn_mg_l_1, tn_mg_l_2)) %>% 
+         tn_mg_l = coalesce(tn_mg_l_1, tn_mg_l_2)) %>% 
   select(-contains("_1"), -contains("_2"),-established, -established_lars) %>% 
   mutate(spec_proportion = n_spec_lake/n_spec_basin,
          lake_basin_area_ratio = lake_area_m2/basin_area_m2,
@@ -153,17 +172,21 @@ saveRDS(all_model_data, paste0(getwd(), "/data_processed/all_model_data.rds"))
 fig_data <- list(fish_basin_species_count, all_model_data, dk_basins, dk_border)
 saveRDS(fig_data, paste0(getwd(), "/figures/fig_gis_data.rds"))
 
-
-
 #Write files with fish data and lake name to files for further inspection
 #Lake names and id's
-lake_names <- readRDS(paste0(getwd(), "/data_raw/lake_names.rds"))
-
-all_model_data %>% 
-  left_join(lake_names) %>% 
-  write.csv2(paste0(getwd(), "/data_raw/all_model_data_names.csv"))
-
-fish_species_lakes %>% 
-  left_join(lake_names) %>% 
-  write.csv2(paste0(getwd(), "/data_raw/fish_species_lakes_names.csv"))
+# lake_names <- readRDS(paste0(getwd(), "/data_raw/lake_names.rds"))
+# 
+# all_model_data %>%
+#   left_join(lake_names) %>%
+#   write.csv2(paste0(getwd(), "/data_raw/all_model_data_names_3.csv"))
+#
+# fish_species_lakes %>%
+#   left_join(lake_names) %>%
+#   write.csv2(paste0(getwd(), "/data_raw/fish_species_lakes_names.csv"))
              
+
+
+
+#tjek chem_secchi og plants rammer i sø polygon !!
+tmp <- all_model_data %>% filter(is.na(pH_pH) & system == "lake")
+mapview(tmp)+(dk_lakes_subset %>% filter(gml_id %in% tmp$gml_id))

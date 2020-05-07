@@ -70,16 +70,6 @@ fish_lake_species_raw <- left_join(fish_net_lake, fish_weight_lake) %>%
   distinct() %>% 
   filter(!is.na(Xutm_Euref89_Zone32))
 
-keep_na_for_zero_catch <- function(spec_col){
-  if(all(is.na(spec_col[[1]]))){
-    df <- tibble(col_name = NA)
-    names(df) <- names(spec_col)
-    return(df)
-  }else{
-    return(na.omit(spec_col))
-  }
-}
-
 fish_lake_species <- fish_lake_species_raw %>% 
   nest(data = c("name_novana")) %>% 
   mutate(na_if_zerocatch = map(data, keep_na_for_zero_catch)) %>% 
@@ -323,31 +313,27 @@ lake_chem_raw <- read_xlsx(paste0(getwd(), "/data_raw/", "odaforalle_chemistry_l
 
 #Combine data, average across depth and calculate mean across year
 lake_secchi_chem <- bind_rows(lake_chem_raw, lake_secchi_raw) %>% 
-  mutate(system = "lake", date = ymd(Startdato), year = year(date),
+  mutate(system = "lake", date = ymd(Startdato), year = year(date), month = month(date),
          Xutm_Euref89_Zone32 = as.numeric(coalesce(Xutm_Euref89_Zone32, Xutm_Euref89_Zone32_ZONE32)), 
          Yutm_Euref89_Zone32 = as.numeric(coalesce(Yutm_Euref89_Zone32, Yutm_Euref89_Zone32_ZONE32)),
          Parameter_cor = ifelse(Parameter == "Chlorophyl (ukorrigeret)", "Chlorophyl A", Parameter),
          var_unit = paste0(Parameter_cor, "_", Enhed),
          avg_sample_depth_m_chem = parse_number(`GennemsnitsDybde i m`, locale = locale(decimal_mark = ",")),
-         avg_sample_depth_m = ifelse(is.na(avg_sample_depth_m_chem), 0, avg_sample_depth_m_chem)) %>% 
-  select(system, name = ObservationsStedNavn, site_id_2 = ObservationsStedNr, date, year, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, 
-         avg_sample_depth_m, var_unit, value = Resultat) %>% 
-  group_by(system, name, site_id_2, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, year, var_unit, date) %>% 
-  summarise(value_mean = mean(value)) %>% 
-  spread(var_unit, value_mean) %>% 
+         avg_sample_depth_m = ifelse(is.na(avg_sample_depth_m_chem), 0, avg_sample_depth_m_chem),
+         summer = ifelse(month %in% c(5:9), "summer", "not summer")) %>% 
+  filter(summer == "summer") %>% 
+  select(system, lake_name = ObservationsStedNavn, site_id_2 = ObservationsStedNr, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, 
+         avg_sample_depth_m, var_unit, value = Resultat, year, date) %>% 
+  group_by(system, lake_name, site_id_2, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, var_unit, year, date, avg_sample_depth_m) %>% 
+  summarise(value_mean_dups = mean(value)) %>% 
+  summarise(value_surface = value_mean_dups[which.min(avg_sample_depth_m)]) %>% 
+  summarise(value_mean_year = mean(value_surface)) %>% 
+  ungroup() %>% 
+  spread(var_unit, value_mean_year) %>% 
   rename(alk_mmol_l = `Alkalinitet,total TA_mmol/l`, chla_ug_l = `Chlorophyl A_µg/l`, tn_mg_l = `Nitrogen,total N_mg/l`, 
          ph_ph = pH_pH, tp_mg_l = `Phosphor, total-P_mg/l`, secchi_depth_m = Sigtdybde_m) %>% 
-  filter(between(secchi_depth_m, 0, 20),
-         between(chla_ug_l, 0, 500),
-         between(alk_mmol_l, 0, 15),
-         between(tn_mg_l, 0, 50),
-         between(tp_mg_l, 0, 50),
-         between(ph_ph, 2, 12),
-         Yutm_Euref89_Zone32 > 700000,
-         year >= 2006) %>% 
-  group_by(system, name, site_id_2, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, year) %>% 
-  summarise_at(vars(alk_mmol_l, chla_ug_l, tn_mg_l, ph_ph, tp_mg_l, secchi_depth_m), list(mean)) %>%
-  ungroup() 
+  filter(Yutm_Euref89_Zone32 > 700000,
+         year >= 2006) 
 
 lake_secchi_chem_sf <- lake_secchi_chem %>% 
   st_as_sf(coords = c("Xutm_Euref89_Zone32", "Yutm_Euref89_Zone32"), crs = dk_epsg)
@@ -371,12 +357,16 @@ sv_list2 <- lapply(sv_files[c(7, 8, 12)], function(path){read_table2(path, local
 sv_list <- c(sv_list1, sv_list2)
 
 #Join nescessary files
+#raw data
 lake_plants_raw <- sv_list$sv_bertotal %>% 
   select(-X10) %>% 
   left_join(select(sv_list$std_enhed, enhed_std = kode, enhed = betegn)) %>% 
   left_join(select(sv_list$sv_berparam, param_std = kode, param = betegn)) %>% 
   left_join(sv_list$sv_dybdeomr) %>% 
-  left_join(sv_list$sv_tilsyn2) %>% 
+  left_join(sv_list$sv_tilsyn2)
+  
+#joined with station info
+lake_plants_stat <- lake_plants_raw %>% 
   filter(dybdeomr_nr == 0 & bertype == 0) %>% 
   mutate(system = "lake", date = dmy(startdato), year = year(date),
          param_unit = paste0(param, "_", enhed)) %>% 
@@ -384,10 +374,17 @@ lake_plants_raw <- sv_list$sv_bertotal %>%
   spread(param_unit, resultat) %>% 
   left_join(select(sv_list$so_cstation3, navn, recopl_id, utm_zone, utm_x, utm_y))
 
-lake_plants <- lake_plants_raw %>% 
+#extract max depth from bathymetry data
+max_depth <- lake_plants_raw %>%
+  group_by(recopl_id) %>%
+  summarise(max_depth_m = max(til_dybde, na.rm = TRUE))
+
+#collect and clean plant data
+lake_plants <- lake_plants_stat %>% 
   mutate(zmean_m = Søvolumen_m3/Søreal_m2) %>% 
+  left_join(max_depth) %>% 
   select(system, year, site_id_3 = recopl_id, name = navn, utm_zone, utm_x, utm_y, area_m2 = Søreal_m2,
-         zmean_m, volume_m3 = Søvolumen_m3, mean_plant_height_m = `Middel plantehøjde_m`,
+         zmean_m, max_depth_m, volume_m3 = Søvolumen_m3, mean_plant_height_m = `Middel plantehøjde_m`,
          plant_area_m2 = `Plantedækket areal_m2`, plant_vol_m3 = `Plantefyldt volumen_m3`,
          plant_area_perc = `Relativ plantedækket areal_pct.`, plant_vol_perc = `Relativ plantefyldt volumen_pct.`) %>% 
   distinct()

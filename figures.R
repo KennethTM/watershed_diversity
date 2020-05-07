@@ -30,8 +30,9 @@ df <- fish_basin_species_count %>%
 # m0 <- glm(n_spec_basin ~ basin_area_log10, family = "quasipoisson", data = df)
 # summary(m0)
 
+# #prøv med koordinater for udløb i stedet for centroid
 # library(mgcv);library(gratia)
-# m <- gam(n_spec_basin ~ s(basin_area_log10) + s(X, Y), family = "poisson", data = df)
+# m <- gam(n_spec_basin ~ s(basin_area_log10) + s(X, Y) + s(X, Y), family = "poisson", data = df)
 # summary(m)
 # plot(m)
 # draw(m)
@@ -50,6 +51,9 @@ basin_richness_area <- fish_basin_species_count %>%
 basin_fig <- basin_richness_map + basin_richness_freq + basin_richness_area + plot_layout(ncol = 1) + plot_annotation(tag_levels = "A")
 
 ggsave(paste0(getwd(), "/figures/basin_richness.png"), basin_fig, units = "mm", width = 129, height = 200)
+
+#fit model på gamle søer, predict på nye og undersøg residualer
+# fit model med naturlig - ikke naturlig
 
 #Investigated lakes and age
 lake_map_age <- all_model_data %>% 

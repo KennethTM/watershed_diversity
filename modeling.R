@@ -13,11 +13,11 @@ model_df <- all_model_data %>%
   select(-year_established, -year, -gml_id, -n_spec_lake, -system, -site_id, -basin_id, -lake_stream_connect) %>% 
   select(-lake_area_m2, -lake_circum_m, -basin_area_m2, -basin_circum_m,
          -lake_circum_log10, -basin_circum_log10,
-         -plant_vol_perc, -dist_to_sea_m, -sum_stream_length_m, -sum_lake_area_m2)
+         -plant_vol_perc, -dist_to_sea_m)
 
 #Examine correlations
 cont_preds <- model_df %>% 
-  select(-basin_id_fact, -lake_stream_connect_binary, -n_spec_basin, -spec_proportion)
+  select(-basin_id_fact, -lake_stream_connect_binary, -n_spec_basin, -spec_proportion, -zmean_m)
 
 cond_preds_cor <- cor(cont_preds, use = "pairwise.complete.obs")
 corrplot.mixed(cond_preds_cor)
@@ -30,12 +30,12 @@ corvif(cont_preds)
 model_df_scale <- cont_preds %>% 
   mutate_all(list(scale)) %>% 
   bind_cols(select(model_df, basin_id_fact, lake_stream_connect_binary, n_spec_basin, spec_proportion)) %>% 
-  select(-plant_area_perc, -zmean_m) %>% #Removed as it is not important
+  select(-plant_area_perc, -zmax_m, -alk_meq_l, -tn_mg_l, -tp_mg_l) %>% #Removed as it is not important
   na.omit()
 
 #Fit ordinary glm
 global_glm <- glm(spec_proportion~elevation+lake_dev_ind+
-                   secchi_depth_m+pH_pH+alk_meq_l+chla_ug_l+tp_mg_l+lake_basin_area_ratio+
+                   secchi_depth_m+pH_pH+chla_ug_l+lake_basin_area_ratio+
                    basin_area_log10+lake_area_log10+lake_stream_connect_binary,
                  weights=n_spec_basin, 
                  data=model_df_scale, 
@@ -44,7 +44,7 @@ summary(global_glm)
 
 #Fit glmm with basin_id as random
 global_glmm <- glmer(spec_proportion~elevation+lake_dev_ind+
-                    secchi_depth_m+pH_pH+alk_meq_l+chla_ug_l+tp_mg_l+lake_basin_area_ratio+
+                    secchi_depth_m+pH_pH+chla_ug_l+lake_basin_area_ratio+
                     basin_area_log10+lake_area_log10+lake_stream_connect_binary+(1|basin_id_fact),
                   weights=n_spec_basin, 
                   data=model_df_scale, 
@@ -79,25 +79,20 @@ overdisp_fun(glmm_0)
 
 #Backwards elimination of variables untill all terms are significant
 drop1(glmm_0, test = "Chisq")
-glmm_1 <- update(glmm_0, . ~ . -lake_dev_ind)
+glmm_1 <- update(glmm_0, . ~ . -chla_ug_l)
 
 drop1(glmm_1, test = "Chisq")
-glmm_2 <- update(glmm_1, . ~ . -chla_ug_l)
+glmm_2 <- update(glmm_1, . ~ . -secchi_depth_m)
 
 drop1(glmm_2, test = "Chisq")
-glmm_3 <- update(glmm_2, . ~ . -lake_basin_area_ratio)
+glmm_3 <- update(glmm_2, . ~ . -lake_dev_ind)
 
 drop1(glmm_3, test = "Chisq")
-glmm_4 <- update(glmm_3, . ~ . -secchi_depth_m)
-
-drop1(glmm_4, test = "Chisq")
-glmm_5 <- update(glmm_4, . ~ . -tp_mg_l)
-
-drop1(glmm_5, test = "Chisq")
+glmm_4 <- update(glmm_3, . ~ . -lake_basin_area_ratio)
 
 #include squared terms
-glmm_6 <- update(glmm_5, . ~ . + I(pH_pH^2)+I(lake_area_log10^2)-alk_meq_l) 
-drop1(glmm_6, test = "Chisq")
+glmm_5 <- update(glmm_4, . ~ . + I(lake_area_log10^2)+I(basin_area_log10^2)) 
+drop1(glmm_5, test = "Chisq")
 
 #calculate goodness of fit
 # glm_6 <- glm(spec_proportion ~ elevation + pH_pH + basin_area_log10 + lake_area_log10 +  
@@ -109,27 +104,27 @@ drop1(glmm_6, test = "Chisq")
 # library(piecewiseSEM)
 # rsquared(glm_6)
 
-r.squaredGLMM(glmm_6)
+r.squaredGLMM(glmm_5)
 
 r2.corr.mer <- function(m){
   lmfit <-  lm(model.response(model.frame(m)) ~ fitted(m))
   summary(lmfit)$r.squared
 }
-r2.corr.mer(glmm_6)
+r2.corr.mer(glmm_5)
 
 #Validate model
-plot(glmm_6)
+plot(glmm_5)
 
-conf_intervals <- confint(glmm_6, method = "profile")
+conf_intervals <- confint(glmm_5, method = "profile")
 
-deviance(glmm_6)/df.residual(glmm_6) 
+deviance(glmm_5)/df.residual(glmm_5) 
 
 #Plots
-ph <- ggeffect(glmm_6, terms = "pH_pH [all]")
-elev <- ggeffect(glmm_6, terms = "elevation [all]")
-basin_area <- ggeffect(glmm_6, terms = "basin_area_log10 [all]")
-lake_area <- ggeffect(glmm_6, terms = "lake_area_log10 [all]")
-connect <- ggeffect(glmm_6, terms = "lake_stream_connect_binary")
+ph <- ggeffect(glmm_5, terms = "pH_pH [all]")
+elev <- ggeffect(glmm_5, terms = "elevation [all]")
+basin_area <- ggeffect(glmm_5, terms = "basin_area_log10 [all]")
+lake_area <- ggeffect(glmm_5, terms = "lake_area_log10 [all]")
+connect <- ggeffect(glmm_5, terms = "lake_stream_connect_binary")
 
 ph_plot <- ggplot(data = tbl_df(ph), aes(x, predicted)) +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), fill = "coral")+
@@ -167,7 +162,7 @@ connect_plot <- ggplot(data = tbl_df(connect), aes(x, predicted)) +
   ylab("Richness")
 
 obs_pred_plot <- model_df_scale %>% 
-  mutate(fitted_values = fitted(glmm_6)) %>% 
+  mutate(fitted_values = fitted(glmm_5)) %>% 
   ggplot(aes(fitted_values, spec_proportion)) +
   geom_abline(slope=1, intercept = 0, linetype = 2)+
   geom_point(alpha=0.2)+
