@@ -1,5 +1,14 @@
 source("libs_and_funcs.R")
 
+
+
+
+#find watershed/stream outlet intersect
+#exctract stream vector with r.stream.extract og dem/accum fra r.watershed
+
+
+
+
 #Use dem 25 m DEM as template
 #Use 10 m DEM later perhaps, memory swap might needed for hydrological algorithms
 dk_dem_25_path <- paste0(getwd(), "/data_processed/dk_dem_25.tif")
@@ -54,9 +63,43 @@ dem_basins_sf <- dem_basins_sp %>%
   group_by(basin_id) %>% 
   summarise() %>% 
   st_cast("MULTIPOLYGON") %>% 
-  st_set_crs(dk_epsg)
+  st_set_crs(dk_epsg) %>% 
+  st_make_valid()
 
 st_write(dem_basins_sf, dsn = gis_database, layer = "dk_basins", delete_layer = TRUE)
+
+#Extract vector stream network as vector
+execGRASS("r.stream.extract", flags = c("overwrite"), 
+          parameters = list(elevation = "dem_hydrodem",
+                            accumulation = "dem_acc",
+                            threshold = 100,
+                            stream_vector = "dem_stream_vect",
+                            memory = 4000))
+
+#Export line vector and save to gis database
+stream_line_vect <- readVECT("dem_stream_vect", type = "line", layer = "1") %>% 
+  st_as_sf() %>% 
+  st_set_crs(dk_epsg)
+
+st_write(stream_line_vect, dsn = gis_database, layer = "dk_dem_streams_lines", delete_layer = TRUE)
+
+#Export point vector and save to gis database
+#Attribute var "cat" = 2 is stream/basin outlets
+stream_point_vect <- readVECT("dem_stream_vect", type = "point", layer = "2") %>% 
+  st_as_sf() %>% 
+  st_set_crs(dk_epsg)
+
+st_write(stream_point_vect, dsn = gis_database, layer = "dk_dem_streams_points", delete_layer = TRUE)
+
+
+
+
+
+
+
+
+
+
 
 # #Delineate lake watersheds
 # #Find lakes with fish species data

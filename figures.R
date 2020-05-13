@@ -1,7 +1,7 @@
 source("libs_and_funcs.R")
 
 #Data for figures
-fig_data <- readRDS(paste0(getwd(), "/figures/fig_gis_data.rds"))
+fig_data <- readRDS(paste0(getwd(), "/figures/fig_gis_data.rds")) #not updated
 fish_basin_species_count  <- fig_data[[1]]
 all_model_data  <- fig_data[[2]]
 dk_basins <- fig_data[[3]]

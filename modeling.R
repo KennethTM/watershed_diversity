@@ -29,7 +29,7 @@ corvif(cont_preds)
 #Binomial model
 model_df_scale <- cont_preds %>% 
   mutate_all(list(scale)) %>% 
-  bind_cols(select(model_df, basin_id_fact, lake_stream_connect_binary, n_spec_basin, spec_proportion)) %>% 
+  bind_cols(select(model_df, basin_id_fact, lake_stream_connect_binary, n_spec_basin, spec_proportion, outlet_x, outlet_y)) %>% 
   select(-plant_area_perc, -zmax_m, -alk_meq_l, -tn_mg_l, -tp_mg_l) %>% #Removed as it is not important
   na.omit()
 

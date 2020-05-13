@@ -4,6 +4,7 @@ source("libs_and_funcs.R")
 #Read layers from database
 #Calculate attributes for basins and lakes
 #st_layers(gis_database)
+
 dk_border <- st_read(dsn = gis_database, layer = "dk_border") 
 dk_streams <- st_read(dsn = gis_database, layer = "dk_streams") %>% 
   mutate(stream_length_m = as.numeric(st_length(GEOMETRY)))
@@ -18,9 +19,18 @@ lake_plants <- st_read(dsn = gis_database, layer = "lake_plants")
 lake_plants_edit <- st_read(dsn = gis_database, layer = "lake_plants_edit") 
 
 dk_basins <- st_read(dsn = gis_database, layer = "dk_basins") %>% 
-  st_make_valid() %>% 
   mutate(basin_area_m2 = as.numeric(st_area(GEOMETRY)),
          basin_circum_m = as.numeric(st_length(st_cast(GEOMETRY, "MULTILINESTRING"))))
+
+dk_basins_outlets <- st_read(dsn = gis_database, layer = "dk_dem_streams_points") %>%
+  filter(cat == 2) %>%
+  cbind(., st_coordinates(.)) %>%
+  select(outlet_x = X, outlet_y = Y) %>% 
+  st_join(dk_basins) %>%
+  st_drop_geometry() %>% 
+  na.omit() %>%
+  group_by(basin_id) %>% 
+  summarise(outlet_x = first(outlet_x), outlet_y = first(outlet_y))
 
 dk_lakes_subset <- st_read(dsn = gis_database, layer = "dk_lakes_subset") %>% 
   mutate(lake_area_m2 = as.numeric(st_area(GEOMETRY)),
@@ -145,6 +155,7 @@ all_model_data <- fish_lake_species_count %>%
   left_join(df_secchi_chem) %>% 
   left_join(df_plants) %>% 
   left_join(chem_newlakes) %>% 
+  left_join(dk_basins_outlets) %>% 
   mutate(year_established = coalesce(established, established_lars),
          secchi_depth_m = coalesce(secchi_depth_m_1, secchi_depth_m_2),
          pH_pH = coalesce(pH_pH_1, ph_ph_2),
