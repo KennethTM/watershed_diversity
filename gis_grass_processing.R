@@ -1,14 +1,5 @@
 source("libs_and_funcs.R")
 
-
-
-
-#find watershed/stream outlet intersect
-#exctract stream vector with r.stream.extract og dem/accum fra r.watershed
-
-
-
-
 #Use dem 25 m DEM as template
 #Use 10 m DEM later perhaps, memory swap might needed for hydrological algorithms
 dk_dem_25_path <- paste0(getwd(), "/data_processed/dk_dem_25.tif")
@@ -54,14 +45,21 @@ execGRASS("r.to.vect", flags = c("s", "overwrite"),
                             output = "dem_basins",
                             type = "area"))
 
+#extract elevation range for each basin
+execGRASS("v.rast.stats", 
+          parameters = list(map = "dem_basins",
+                            raster = "dem_hydrodem",
+                            column_prefix = "dem",
+                            method =  "range,average"))
+
 #Import vector file to R
 dem_basins_sp <- readVECT("dem_basins")
 
 dem_basins_sf <- dem_basins_sp %>% 
   st_as_sf() %>% 
-  select(basin_id = value) %>% 
+  select(basin_id = value, dem_range, dem_average) %>% 
   group_by(basin_id) %>% 
-  summarise() %>% 
+  summarise(elev_range_m = max(dem_range), elev_mean_m = mean(dem_average)) %>% 
   st_cast("MULTIPOLYGON") %>% 
   st_set_crs(dk_epsg) %>% 
   st_make_valid()
@@ -90,6 +88,9 @@ stream_point_vect <- readVECT("dem_stream_vect", type = "point", layer = "2") %>
   st_set_crs(dk_epsg)
 
 st_write(stream_point_vect, dsn = gis_database, layer = "dk_dem_streams_points", delete_layer = TRUE)
+
+
+
 
 
 

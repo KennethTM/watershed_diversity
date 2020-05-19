@@ -11,7 +11,7 @@ source("libs_and_funcs.R")
 #Write vector files for further processing to gis_database
 
 #Download Denmark polygon, cut Bornholm and reproject
-dk_border_raw <- getData("GADM", country = "DNK", level = 0, path = paste0(getwd(), "/data_raw"))
+dk_border_raw <- raster::getData("GADM", country = "DNK", level = 0, path = paste0(getwd(), "/data_raw"))
 
 dk_border <- dk_border_raw %>% 
   st_as_sf() %>% 	
@@ -19,6 +19,14 @@ dk_border <- dk_border_raw %>%
   st_transform(dk_epsg)	
 
 st_write(dk_border, dsn = gis_database, layer = "dk_border", delete_layer = TRUE)#, dataset_options = "SPATIALITE=YES"
+
+#Lines of ice progression during last ice age (data from GEUS)
+ice_poly <- st_read(paste0(getwd(), "/data_raw/Isrande/Isrande_shape_format/Data/Isrand_poly.shp")) %>% 
+  slice(1) %>% 
+  st_transform(dk_epsg) %>% 
+  st_crop(dk_border)
+
+st_write(ice_poly, dsn = gis_database, layer = "dk_iceage", delete_layer = TRUE)
 
 #Reproject and cut EU-DEM using dk_poly
 #Cut and reproject
@@ -305,6 +313,12 @@ dk_lakes_subset <- dk_lakes_edit %>%
   filter(gml_id %in% fish_species_lakes_edit_sf$gml_id) 
 
 st_write(dk_lakes_subset, dsn = gis_database, layer = "dk_lakes_subset", delete_layer = TRUE)
+
+#Write editted dk_lakes_layer to file 
+dk_lakes_edit_with_area <- dk_lakes_edit %>% 
+  mutate(area=as.numeric(st_area(geometry)))
+
+st_write(dk_lakes_edit_with_area, dsn = gis_database, layer = "dk_lakes_edit", delete_layer = TRUE)
 
 #Secchi depth and chemistry data
 #lake id's in secchi and chemistry data do not match that of fish data

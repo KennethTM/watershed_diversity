@@ -3,6 +3,9 @@ library(rgrass7);library(link2GI);library(patchwork);library(lwgeom)
 library(mapview)
 library(lme4)
 library(MuMIn);library(ggeffects);library(corrplot)
+library(mgcv)
+#library(gratia)
+library(mgcViz)
 
 #Projection, as EPSG number, used for spatial analysis (UTM ZONE 32)
 dk_epsg <- 25832

@@ -1,11 +1,11 @@
 source("libs_and_funcs.R")
 
 #Data for figures
-fig_data <- readRDS(paste0(getwd(), "/figures/fig_gis_data.rds")) #not updated
-fish_basin_species_count  <- fig_data[[1]]
-all_model_data  <- fig_data[[2]]
-dk_basins <- fig_data[[3]]
-dk_border <- fig_data[[4]]
+# fig_data <- readRDS(paste0(getwd(), "/figures/fig_gis_data.rds")) #not updated
+# fish_basin_species_count  <- fig_data[[1]]
+# all_model_data  <- fig_data[[2]]
+# dk_basins <- fig_data[[3]]
+# dk_border <- fig_data[[4]]
 
 #Basin richness
 basin_richness_freq <- fish_basin_species_count %>% 
@@ -27,16 +27,7 @@ df <- fish_basin_species_count %>%
   cbind(st_coordinates(st_centroid(.))) %>% 
   st_drop_geometry()
 
-# m0 <- glm(n_spec_basin ~ basin_area_log10, family = "quasipoisson", data = df)
-# summary(m0)
 
-# #prøv med koordinater for udløb i stedet for centroid
-# library(mgcv);library(gratia)
-# m <- gam(n_spec_basin ~ s(basin_area_log10) + s(X, Y) + s(X, Y), family = "poisson", data = df)
-# summary(m)
-# plot(m)
-# draw(m)
-# appraise(m)
 
 basin_richness_area <- fish_basin_species_count %>% 
   mutate(basin_area_log10 = log10(basin_area_m2)) %>% 
