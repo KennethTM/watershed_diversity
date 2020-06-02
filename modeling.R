@@ -54,9 +54,9 @@ m1 <- gam(n_spec_basin ~ s(elev_range_m) +
             s(outlet_x, outlet_y), family = "quasipoisson", method = "REML", data = basin_gam_df, select = TRUE)
 
 summary(m1)
-gam.check(m1)
+plot(m1)
 
-gamviz <- getViz(m1)
+gamviz <- getViz(m2)
 plot(sm(gamviz, 1))+l_ciPoly()+l_fitLine()
 plot(sm(gamviz, 2))+l_ciPoly()+l_fitLine()
 plot(sm(gamviz, 3))+l_ciPoly()+l_fitLine()

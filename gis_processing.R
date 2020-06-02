@@ -66,13 +66,18 @@ chem_newlakes <- readRDS(paste0(getwd(), "/data_raw/chem_newlakes.rds")) %>%
          chla_ug_l_1 = chla_ug_l, tp_mg_l_1 = tp_mg_l, tn_mg_l_1 = tn_mg_l)
 
 new_lakes_age <- read_xlsx(paste0(getwd(), "/data_raw/new_lakes_age.xlsx")) %>% 
-  rename(established_lars = year) %>% 
+  rename(established_extra = year) %>% 
   na.omit() %>% 
   st_as_sf(coords = c("lat", "long"), crs = 4326) %>% 
   st_transform(dk_epsg)
 
 dk_lakes_subset_age <- dk_lakes_subset %>% 
   st_join(new_lakes_age) 
+
+#Read additional lakes establishement years for join
+new_lakes_age_extra <- read_xlsx(paste0(getwd(), "/data_raw/all_model_data_names_EK.xlsx"), sheet = 2) %>% 
+  filter(established_extra_extra != "NA") %>% 
+  mutate(established_extra_extra = as.numeric(established_extra_extra))
 
 #Read data from danish fish atlas
 fish_atlas <- read_delim(paste0(getwd(), "/data_raw/Atlas_data_danish_latin_id_basin.csv"), delim = " ") %>% 
@@ -98,7 +103,9 @@ fish_basin_species_count <- bind_rows(fish_atlas, fish_monitoring) %>%
   left_join(dk_basins_lake_area) %>% 
   left_join(dk_basins_outlets) %>% 
   st_as_sf() %>% 
-  mutate(basin_ice_covered = factor(st_intersects(dk_iceage, st_centroid(GEOMETRY), sparse = FALSE))) # %>%  cbind(., st_coordinates(st_centroid(.)))? compute basin centroid coords also?
+  mutate(basin_ice_covered = factor(st_intersects(dk_iceage, st_centroid(GEOMETRY), sparse = FALSE)))  %>%  
+  cbind(., st_coordinates(st_centroid(.))) %>% 
+  rename(centroid_x = X, centroid_y = Y)
 
 #Count species richness in each lakes
 fish_lake_species_count <- fish_species_lakes %>%
@@ -158,14 +165,15 @@ all_model_data <- fish_lake_species_count %>%
   left_join(df_secchi_chem) %>% 
   left_join(df_plants) %>% 
   left_join(chem_newlakes) %>% 
-  mutate(year_established = coalesce(established, established_lars),
+  left_join(new_lakes_age_extra) %>% 
+  mutate(year_established = coalesce(established, established_extra, established_extra_extra),
          secchi_depth_m = coalesce(secchi_depth_m_1, secchi_depth_m_2),
          pH_pH = coalesce(pH_pH_1, ph_ph_2),
          alk_meq_l = coalesce(alk_meq_l_1, alk_meq_l_2),
          chla_ug_l = coalesce(chla_ug_l_1, chla_ug_l_2),
          tp_mg_l = coalesce(tp_mg_l_1, tp_mg_l_2),
          tn_mg_l = coalesce(tn_mg_l_1, tn_mg_l_2)) %>% 
-  select(-contains("_1"), -contains("_2"),-established, -established_lars) %>% 
+  select(-contains("_1"), -contains("_2"),-established, -established_extra, -established_extra_extra) %>% 
   mutate(spec_proportion = n_spec_lake/n_spec_basin,
          lake_basin_area_ratio = lake_area_m2/basin_area_m2,
          basin_area_log10 = log10(basin_area_m2),
@@ -203,5 +211,5 @@ saveRDS(model_and_fig_data, paste0(getwd(), "/data_processed/model_and_fig_data.
 # 
 # all_model_data %>%
 #   left_join(lake_names) %>%
-#   write.csv2(paste0(getwd(), "/data_raw/all_model_data_names_3.csv"))
+#   write.csv2(paste0(getwd(), "/data_raw/all_model_data_names_02062020.csv"))
 
