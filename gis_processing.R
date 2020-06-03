@@ -211,5 +211,5 @@ saveRDS(model_and_fig_data, paste0(getwd(), "/data_processed/model_and_fig_data.
 # 
 # all_model_data %>%
 #   left_join(lake_names) %>%
-#   write.csv2(paste0(getwd(), "/data_raw/all_model_data_names_02062020.csv"))
+#   write.csv2(paste0(getwd(), "/data_raw/all_model_data_names_03062020.csv"))
 

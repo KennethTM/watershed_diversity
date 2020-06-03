@@ -185,13 +185,22 @@ fish_species_basin_sf <- fish_species_basin %>%
 st_write(fish_species_basin_sf, dsn = gis_database, layer = "fish_species_basin", delete_layer = TRUE)
 
 #Lakes for investigation is all the latest sampling for each lakes after 2006
-fish_species_latest_survey <- fish_species_sub %>% 
-  filter(system %in% c("lake", "newlake")) %>% 
-  select(system, site_id, year) %>% 
-  group_by(system, site_id) %>% 
-  summarise(year_max = max(year)) %>% 
-  ungroup() %>% 
-  filter(year_max >= 2006)
+# fish_species_latest_survey <- fish_species_sub %>%
+#   filter(year >= 2006,
+#          system %in% c("lake", "newlake")) %>%
+#   select(system, site_id, year) %>%
+#   group_by(system, site_id) %>%
+#   summarise(year_max = max(year)) %>%
+#   ungroup()
+
+#Lakes for investigation is sample with highest richness after 2006
+fish_species_richest_survey <- fish_species_sub %>% 
+  filter(year >= 2006,
+         system %in% c("lake", "newlake")) %>% 
+  group_by(system, site_id, year) %>% 
+  summarise(n_spec = ifelse(all(is.na(fish_id)), 0, length(unique(fish_id)))) %>% 
+  summarise(year_max_rich = year[which.max(n_spec)])  %>% 
+  ungroup()
 
 #site_id's to be exclude
 #Two double sampling from the same lake
@@ -200,8 +209,8 @@ fish_lake_doubles <- c(c(14000045, 20000218),
                        c(53000046, 53000047))
 
 #Lakes for investigation
-fish_species_lakes_raw <- fish_species_latest_survey %>% 
-  rename(year = year_max) %>% 
+fish_species_lakes_raw <- fish_species_richest_survey %>% 
+  rename(year = year_max_rich) %>% 
   left_join(fish_species_sub) %>% 
   distinct() %>% 
   filter(!(site_id %in% fish_lake_doubles))

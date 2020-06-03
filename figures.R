@@ -52,11 +52,13 @@ ggsave(paste0(getwd(), "/figures/basin_richness.png"), basin_fig, units = "mm", 
 
 
 #Investigated lakes and age
-lake_map_age <- all_model_data %>% 
+lake_map_age_df <- all_model_data %>% 
   mutate(lake_age = ifelse(is.na(year_established), 9999, year-year_established),
          lake_age_bins = cut(lake_age, breaks = c(0, 10, 20, 50, 100, 1000, 10000), 
                         labels = c("0-10", "10-20", "20-50", "50-100", "100-1000", "Unknown"),
-                        include.lowest = TRUE)) %>% 
+                        include.lowest = TRUE)) 
+
+lake_map_age <- lake_map_age_df %>% 
   ggplot() +
   geom_sf(data = dk_border, col = "black")+
   geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "grey")+
@@ -66,4 +68,15 @@ lake_map_age <- all_model_data %>%
   #theme(legend.position = c(0.8, 0.75))+
   guides(linetype = guide_legend(title = NULL, order = 2), colour = guide_legend(order = 1))
 
-ggsave(paste0(getwd(), "/figures/lake_map_age.png"), lake_map_age, units = "mm", width = 129, height = 100)
+lake_spec_prop <- lake_map_age_df %>% 
+  mutate(spec_prop = n_spec_lake/n_spec_basin,
+         nat_or_art = ifelse(lake_age_bins == "Unknown", "Natural", "New")) %>% 
+  st_drop_geometry() %>% 
+  ggplot(aes(spec_prop))+
+  geom_histogram(fill = NA, col = "black", binwidth = 0.04)+
+  ylab("Frequency")+
+  xlab("Lake:basin richness ratio")
+
+lake_fig <- lake_map_age + lake_spec_prop + plot_layout(ncol = 1) + plot_annotation(tag_levels = "A")
+
+ggsave(paste0(getwd(), "/figures/lake_map_age.png"), lake_fig, units = "mm", width = 129, height = 150)
