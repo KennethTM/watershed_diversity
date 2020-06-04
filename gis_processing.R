@@ -40,6 +40,28 @@ dk_lakes_subset <- st_read(dsn = gis_database, layer = "dk_lakes_subset") %>%
          lake_dev_ind = lake_circum_m/(2*sqrt(pi*lake_area_m2)),
          lake_stream_connect = lengths(st_intersects(GEOMETRY, dk_streams)))
 
+#Compute basin CLC cover of 1) agriculture and 2) artificial surfaces
+#Reproj raster (CLC 2018, 100 m resolution from EU site)
+dk_clc <- gdalwarp(srcfile = paste0(getwd(), "/data_raw/dk_clc_2018_raw.tif"),
+                   dstfile = paste0(getwd(), "/data_raw/dk_clc_2018.tif"),
+                   t_srs = paste0("EPSG:", dk_epsg),
+                   co = "COMPRESS=LZW", 
+                   tr = c(100, 100), 
+                   r = "near",
+                   output_Raster = TRUE)
+
+dk_clc_arti <- (dk_clc %in% c(111, 112, 121, 122, 123, 124, 131, 132, 133, 141, 142))
+dk_clc_agri <- (dk_clc %in% c(211, 212, 213))
+
+dk_basin_arti <- exact_extract(dk_clc_arti, dk_basins, fun = "mean")
+dk_basin_agri <- exact_extract(dk_clc_agri, dk_basins, fun = "mean")
+
+dk_basins_clc <- dk_basins %>% 
+  st_drop_geometry() %>% 
+  select(basin_id) %>% 
+  add_column(basin_prop_arti = dk_basin_arti,
+             basin_prop_agri = dk_basin_agri)
+
 #Compute stream length and lake area in basin 
 #Using centroids for now
 dk_streams_centroid <- st_centroid(select(dk_streams, stream_length_m))
@@ -51,7 +73,8 @@ dk_basins_lake_area <- dk_basins %>%
   st_drop_geometry() %>%
   select(basin_id, lake_area_m2) %>%
   group_by(basin_id) %>%
-  summarise(basin_sum_lake_area_m2 = sum(lake_area_m2), basin_mean_lake_area_m2 = mean(lake_area_m2))
+  summarise(basin_sum_lake_area_m2 = sum(lake_area_m2), 
+            basin_mean_lake_area_m2 = mean(lake_area_m2))
 
 dk_basins_stream_length <- dk_basins %>%
   st_join(dk_streams_centroid) %>%
@@ -102,6 +125,7 @@ fish_basin_species_count <- bind_rows(fish_atlas, fish_monitoring) %>%
   left_join(dk_basins_stream_length) %>% 
   left_join(dk_basins_lake_area) %>% 
   left_join(dk_basins_outlets) %>% 
+  left_join(dk_basins_clc) %>% 
   st_as_sf() %>% 
   mutate(basin_ice_covered = factor(st_intersects(dk_iceage, st_centroid(GEOMETRY), sparse = FALSE)))  %>%  
   cbind(., st_coordinates(st_centroid(.))) %>% 

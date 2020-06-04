@@ -18,6 +18,8 @@ basin_df <- model_and_fig_data[[1]] %>%
          log10_basin_area_m2 = log10(basin_area_m2),
          log10_basin_area_m2 = log10(basin_area_m2),
          log10_basin_circum_m = log10(basin_circum_m),
+         sqrt_basin_prop_arti = sqrt(basin_prop_arti),
+         sqrt_basin_prop_agri = sqrt(basin_prop_agri),
          water_basin_ratio = basin_sum_lake_area_m2/basin_area_m2)
 
 summary(basin_df)
@@ -26,8 +28,11 @@ summary(basin_df)
 basin_preds <- basin_df %>% 
   select(-basin_id, -basin_ice_covered, -n_spec_basin, 
          -basin_sum_stream_length_m, -basin_sum_lake_area_m2,
-         -basin_circum_m, -basin_area_m2, -log10_basin_circum_m, -log10_basin_area_m2,
-         -log10_basin_mean_lake_area_m2, -elev_mean_m)
+         -basin_circum_m, -basin_area_m2, -water_basin_ratio,
+         -centroid_x, -centroid_y,
+         -basin_prop_arti, -basin_prop_agri,
+         -log10_basin_circum_m, -log10_basin_area_m2,
+         -log10_basin_mean_lake_area_m2, -elev_mean_m, -basin_mean_lake_area_m2)
 
 basin_cor <- cor(basin_preds)
 
@@ -37,31 +42,54 @@ corrplot.mixed(basin_cor)
 #Drop variables such that maximum VIF is not higher than 3 
 corvif(basin_preds)
 
+basin_preds %>% 
+  gather(variable, value) %>% 
+  ggplot(aes(value))+
+  geom_histogram()+
+  facet_wrap(variable~., scales = "free")
+
 #Model basin species richness using poisson GAM
 basin_gam_df <- basin_df %>% 
   select(basin_ice_covered, n_spec_basin) %>% 
   bind_cols(basin_preds)
 
 m0 <- gam(n_spec_basin ~ s(elev_range_m) + basin_ice_covered + 
-            s(log10_basin_sum_lake_area_m2) + s(log10_basin_sum_stream_length_m) + s(basin_mean_lake_area_m2)+
-            s(water_basin_ratio) + s(outlet_x, outlet_y), family = "poisson", method = "REML", data = basin_gam_df)
+            s(log10_basin_sum_lake_area_m2) + s(log10_basin_sum_stream_length_m)+
+            s(sqrt_basin_prop_arti)+s(sqrt_basin_prop_agri)+
+            s(outlet_x, outlet_y), 
+          family = "poisson", method = "REML", data = basin_gam_df, select = TRUE)
 
 summary(m0)
-plot(m0)
 
-m1 <- gam(n_spec_basin ~ s(elev_range_m) + 
+#test for overdispersion
+deviance(m0)/df.residual(m0)
+
+#refit with quasipoisson
+m1 <- gam(n_spec_basin ~ s(elev_range_m) + basin_ice_covered + 
             s(log10_basin_sum_lake_area_m2) + s(log10_basin_sum_stream_length_m)+
-            s(outlet_x, outlet_y), family = "quasipoisson", method = "REML", data = basin_gam_df, select = TRUE)
+            s(sqrt_basin_prop_arti)+s(sqrt_basin_prop_agri)+
+            s(outlet_x, outlet_y), 
+          family = "quasipoisson", method = "REML", data = basin_gam_df, select = TRUE)
 
 summary(m1)
-plot(m1)
 
-gamviz <- getViz(m2)
-plot(sm(gamviz, 1))+l_ciPoly()+l_fitLine()
-plot(sm(gamviz, 2))+l_ciPoly()+l_fitLine()
-plot(sm(gamviz, 3))+l_ciPoly()+l_fitLine()
-plot(sm(gamviz, 4))+l_fitRaster()+l_points()
+m2 <- gam(n_spec_basin ~ s(elev_range_m) + basin_ice_covered + 
+            s(log10_basin_sum_lake_area_m2) + s(log10_basin_sum_stream_length_m)+
+            s(sqrt_basin_prop_arti)+sqrt_basin_prop_agri+
+            s(outlet_x, outlet_y), 
+          family = "quasipoisson", method = "REML", data = basin_gam_df, select = TRUE)
 
+summary(m2)
+
+gamviz <- getViz(m1)
+check(gamviz)
+print(plot(gamviz, allTerms = T), pages = 1)
+# plot(sm(gamviz, 1))+l_ciPoly()+l_fitLine()
+# plot(sm(gamviz, 2))+l_ciPoly()+l_fitLine()
+# plot(sm(gamviz, 3))+l_ciPoly()+l_fitLine()
+# plot(sm(gamviz, 4))+l_ciPoly()+l_fitLine()
+# plot(sm(gamviz, 5))+l_ciPoly()+l_fitLine()
+# plot(sm(gamviz, 6))+l_fitRaster()+l_points()
 
 
 
@@ -95,7 +123,8 @@ cont_preds <- model_df %>%
   select(-basin_id_fact, -lake_ice_covered, -lake_stream_connect_binary, -n_spec_basin, -spec_proportion) %>% 
   select(-basin_area_log10, -lake_circum_log10, -basin_circum_log10, -log10_basin_sum_stream_length_m,
          -plant_vol_perc, -water_basin_ratio, -degree_weight, -elev_range_m, -zmean_m, -log10_basin_mean_lake_area_m2,
-         -tp_mg_l, -lake_basin_area_ratio)
+         -tp_mg_l, -lake_basin_area_ratio,
+         -basin_prop_arti, -basin_prop_agri)
 
 cond_preds_cor <- cor(cont_preds, use = "pairwise.complete.obs")
 corrplot.mixed(cond_preds_cor)
