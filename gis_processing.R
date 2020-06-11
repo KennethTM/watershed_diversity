@@ -237,6 +237,8 @@ saveRDS(model_and_fig_data, paste0(getwd(), "/data_processed/model_and_fig_data.
 #   left_join(lake_names) %>%
 #   write.csv2(paste0(getwd(), "/data_raw/all_model_data_names_03062020.csv"))
 
+
+
 # #udskrift af basin og lake arts data til emil
 # fish_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/", "fish_unique_edit_final.xlsx")) %>% 
 #   select(name = name_to_use, name_novana = name_local_novana, name_atlas = latin_and_atlas,

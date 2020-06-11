@@ -35,17 +35,6 @@ basin_richness_map <- dk_basins %>%
   #scale_fill_gradient(low = grey(1), high = grey(0.1))
   scale_fill_viridis_c(na.value="white", option = "D", name = "Basin richness", direction = -1, begin = 0.2)
 
-# basin_richness_area <- basin_data %>% 
-#   mutate(basin_sum_lake_area_m2 = ifelse(is.na(basin_sum_lake_area_m2), 0, basin_sum_lake_area_m2),
-#          basin_sum_lake_area_m2_log10 = log10(basin_sum_lake_area_m2+1)) %>% 
-#   st_drop_geometry() %>% 
-#   ggplot(aes(basin_sum_lake_area_m2_log10, n_spec_basin))+
-#   geom_point(alpha = 0.3)+
-#   geom_density2d(col = "coral")+
-#   #geom_smooth(method = 'glm', method.args = list(family = 'poisson'))+
-#   ylab("Basin richness")+
-#   xlab("Basin lake area (log10+1(km2))")
-
 basin_fig <- basin_richness_map + basin_richness_freq + plot_layout(ncol = 1) + plot_annotation(tag_levels = "A")
 
 ggsave(paste0(getwd(), "/figures/basin_richness.png"), basin_fig, units = "mm", width = 129, height = 150)
@@ -77,19 +66,20 @@ lake_spec_prop <- lake_map_age_df %>%
   #geom_density(aes(spec_prop), fill = NA)+
   geom_freqpoly(aes(spec_prop, col = nat_or_art))+
   geom_histogram(aes(spec_prop), fill = NA, col = "black", binwidth = 0.04)+
-  scale_color_manual(values = c("coral", "black"), name = "Lake class")+
+  scale_color_manual(values = c("coral", viridisLite::viridis(1, begin = 0.5, end = 0.6)), name = "Lake group")+
   ylab("Frequency")+
-  xlab("Lake:basin richness ratio")#+ lav legend title
-  #theme(legend.title = element_blank(), legend.position = c(0.7, 0.8))
+  xlab("Lake:basin richness ratio")
 
-lake_map_age_df %>% 
+lake_spec_prop_basin_rich <- lake_map_age_df %>% 
   st_drop_geometry() %>% 
-  ggplot(aes(y=spec_prop, x = n_spec_basin, col = lake_age_bins)) +
-  geom_point()+
+  ggplot(aes(y=spec_prop, x = n_spec_basin, col = basin_area_m2)) +
+  geom_point(size = 0.7)+
   ylab("Lake:basin richness ratio")+
   xlab("Basin species richness")+
-  scale_colour_manual(values = c(viridisLite::viridis(4, direction = -1), "coral"), name = "Lake age (years)")
+  scale_colour_viridis_c(trans = "log10", name = expression(log[10]*"(basin area [m"^{2}*"])"), option = "D", begin = 0.1)
 
-slake_fig <- lake_map_age + lake_spec_prop + plot_layout(ncol = 1) + plot_annotation(tag_levels = "A")
+lake_fig <- lake_map_age + lake_spec_prop + lake_spec_prop_basin_rich + 
+  plot_layout(ncol = 1) + 
+  plot_annotation(tag_levels = "A")
 
-ggsave(paste0(getwd(), "/figures/lake_richness.png"), lake_fig, units = "mm", width = 129, height = 150)
+ggsave(paste0(getwd(), "/figures/lake_richness.png"), lake_fig, units = "mm", width = 129, height = 200)
