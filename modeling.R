@@ -73,11 +73,14 @@ m1 <- gam(n_spec_basin ~ s(elev_range_m) + basin_ice_covered +
 
 summary(m1)
 
+#all terms significant, keep model
+
 gamviz <- getViz(m1)
 
-#check(gamviz)
+check(gamviz)
 
-add_model_int <- function(x){round(exp(x + as.numeric(coef(m1)[1])), 0)} #add model intercept on original scale
+#funciton for adding model intercept on original scale to partial smooth plots
+add_model_int <- function(x){round(exp(x + as.numeric(coef(m1)[1])), 0)} 
 
 #print(plot(gamviz, allTerms = T), pages = 1)
 
@@ -165,16 +168,7 @@ basin_gam_allplots <- gridPrint(p1, p2, p3, p4, p5, p6, p7, p8, ncol=2)
 
 ggsave(paste0(getwd(), "/figures/basin_gam.png"), basin_gam_allplots, units = "mm", width = 174, height = 234)
 
-
-
-
-#tjek dist til sea for søer
-#gennemgå sømodel igen!!!
-#lav ensartet preproc for basin og sø model
-#drop basins med < 5 eller 10 arter
-
-
-
+################################
 
 #Lake level data
 #Set NA network metrics to zero (not connected), except for Mjelssø which was outside area and thus not evaluated
@@ -197,7 +191,7 @@ summary(lake_df)
 #Examine distribution and correlations
 lake_preds <- lake_df %>% 
   select(-site_id, -age, -basin_id_fact, -spec_proportion, -n_spec_basin, -lake_ice_covered, -lake_stream_connect_binary) %>% 
-  mutate_at(vars(between, degree, degree_weight, lake_stream_connect,plant_vol_perc, plant_area_perc), list(~log10(. + 1))) %>% 
+  mutate_at(vars(between, degree, degree_weight, lake_stream_connect,plant_vol_perc, plant_area_perc), list(~sqrt(.))) %>% 
   mutate_at(vars(chla_ug_l, zmean_m, zmax_m, tn_mg_l, tp_mg_l, outlet_dist_m), list(~log10(.))) %>% 
   select(-lake_circum_log10, -plant_vol_perc, -zmean_m, -degree, -secchi_depth_m) #remove variables based on VIF
 
@@ -215,11 +209,12 @@ corrplot.mixed(cond_preds_cor)
 corvif(lake_preds)
 
 #Binomial model
+#all basin with <10 species excluded
 lake_model_df <- lake_preds %>% 
   #mutate_all(scale) %>% 
   bind_cols(select(lake_df, site_id, age, basin_id_fact, spec_proportion, n_spec_basin, lake_ice_covered, lake_stream_connect_binary)) %>% 
   filter(n_spec_basin > 10) %>% 
-  select(-tn_mg_l, -tp_mg_l, -plant_area_perc, -zmax_m, -alk_meq_l) #%>% #remove variable which are not important 
+  select(-tn_mg_l, -tp_mg_l, -plant_area_perc, -zmax_m, -alk_meq_l) #%>% #remove variable which are not important, higher n obs as a result
 
 summary(lake_model_df)
 
@@ -234,36 +229,45 @@ new_lakes <- lake_model_df %>%
   #select(-age) %>% 
   na.omit()
 
+#check if data from plant monitoring has significant effects or if they should be dropped to include more observations
+# include_plant_data <- gam(spec_proportion ~ s(elevation) + s(lake_area_log10) + s(lake_stream_connect) +
+#                             s(degree_weight)+s(between)+
+#                             s(pH_pH) + s(chla_ug_l)+
+#                             s(outlet_dist_m)+
+#                             s(tp_mg_l)+s(tn_mg_l)+s(plant_area_perc)+s(zmax_m)+s(alk_meq_l)+
+#                             #s(basin_id_fact, bs = "re")+
+#                             lake_ice_covered+lake_stream_connect_binary+
+#                             s(lake_x, lake_y),
+#                           family = "binomial",
+#                           weights=n_spec_basin,
+#                           method = "REML",
+#                           data = natural_lakes, select = TRUE, gamma = 1.4)
+# summary(include_plant_data)
+
 #fit gam with random intercept
 lake_m0 <- gam(spec_proportion ~ s(elevation) + s(lake_area_log10) + s(lake_stream_connect) +
                  s(degree_weight)+s(between)+
                  s(pH_pH) + s(chla_ug_l)+
                  s(outlet_dist_m)+
-                 #s(tp_mg_l)+s(tn_mg_l)+s(plant_area_perc)+s(zmax_m)+s(alk_meq_l)+
-                 s(basin_id_fact, bs = "re")+lake_ice_covered+
-                 lake_stream_connect_binary+
+                 s(basin_id_fact, bs = "re")+
+                 lake_ice_covered+lake_stream_connect_binary+
                  s(lake_x, lake_y),
                family = "binomial", 
                weights=n_spec_basin, 
                method = "REML", 
                data = natural_lakes, select = TRUE, gamma = 1.4)
-
 summary(lake_m0)
-#plot(lake_m0)
+gam.check(lake_m0)
 
-#test for overdispersion - close to 1 indicate no overdispersion
+#test for under-verdispersion - close to 1 indicate no overdispersion
 deviance(lake_m0)/df.residual(lake_m0)
 
-#refit without terms penalized to zero
-lake_m1 <- gam(spec_proportion ~ s(elevation) + s(lake_area_log10) +
-                 #s(lake_stream_connect) +s(degree_weight)+
-                 s(between)+
+lake_m1 <- gam(spec_proportion ~ s(elevation) + s(lake_area_log10) + s(lake_stream_connect) +
+                 s(degree_weight)+s(between)+
                  s(pH_pH) + s(chla_ug_l)+
                  s(outlet_dist_m)+
-                 #s(tp_mg_l)+s(tn_mg_l)+s(plant_area_perc)+s(zmax_m)+s(alk_meq_l)+
-                 #s(basin_id_fact, bs = "re")+
-                 #lake_ice_covered+
-                 lake_stream_connect_binary+
+                 s(basin_id_fact, bs = "re")+
+                 lake_ice_covered+lake_stream_connect_binary+
                  s(lake_x, lake_y),
                family = "quasibinomial", 
                weights=n_spec_basin, 
@@ -271,44 +275,58 @@ lake_m1 <- gam(spec_proportion ~ s(elevation) + s(lake_area_log10) +
                data = natural_lakes, select = TRUE, gamma = 1.4)
 
 summary(lake_m1)
+gam.check(lake_m1)
 
-#refit without non-significant terms and update input data
-lake_m2 <- gam(spec_proportion ~ 
-                 s(elevation) + 
-                 s(lake_area_log10) +
-                 #s(lake_stream_connect) +
-                 #s(degree_weight)+
+#quasi improves diagnostic plots
+
+#refit without terms which were penalized to zero
+lake_m2 <- gam(spec_proportion ~ s(elevation) + s(lake_area_log10) +
+                 #s(degree_weight)+s(lake_stream_connect)+s(basin_id_fact, bs = "re")+
                  s(between)+
-                 s(pH_pH) +
-                 s(chla_ug_l)+
+                 s(pH_pH) + s(chla_ug_l)+
                  s(outlet_dist_m)+
-                 #s(tp_mg_l)+s(tn_mg_l)+s(plant_area_perc)+s(zmax_m)+s(alk_meq_l)+
-                 #s(basin_id_fact, bs = "re")+
-                 #lake_ice_covered+
-                 #lake_stream_connect_binary+
+                 lake_ice_covered+lake_stream_connect_binary+
                  s(lake_x, lake_y),
-               family = "quasibinomial", weights=n_spec_basin, 
+               family = "quasibinomial", 
+               weights=n_spec_basin, 
                method = "REML", 
                data = natural_lakes, select = TRUE, gamma = 1.4)
 
 summary(lake_m2)
-#plot(lake_m2)
+
+#refit without non-significant parametric terms 
+lake_m3 <- gam(spec_proportion ~ s(elevation) + s(lake_area_log10) +
+                 #s(degree_weight)+s(lake_stream_connect)+s(basin_id_fact, bs = "re")+
+                 s(between)+
+                 s(pH_pH) + s(chla_ug_l)+
+                 s(outlet_dist_m)+
+                 #lake_ice_covered+
+                 #lake_stream_connect_binary+
+                 s(lake_x, lake_y),
+               family = "quasibinomial", 
+               weights=n_spec_basin, 
+               method = "REML", 
+               data = natural_lakes, select = TRUE, gamma = 1.4)
+
+summary(lake_m3)
+
+gam.check(lake_m3)
+
+#keep model 3
 
 new_lakes_preds <- new_lakes %>%
-  mutate(gam_preds = predict(lake_m2, newdata = ., type = "response"),
+  mutate(gam_preds = predict(lake_m3, newdata = ., type = "response"),
          resid_preds = gam_preds-spec_proportion)
 
-train_mae <- mean(abs(fitted(lake_m2)-natural_lakes$spec_proportion))
-train_rmse <- sqrt(mean((fitted(lake_m2)-natural_lakes$spec_proportion)^2))
+train_mae <- mean(abs(fitted(lake_m3)-natural_lakes$spec_proportion))
+train_rmse <- sqrt(mean((fitted(lake_m3)-natural_lakes$spec_proportion)^2))
 pred_mae <- mean(abs(new_lakes_preds$gam_preds-new_lakes_preds$spec_proportion))
 pred_rmse <- sqrt(mean((new_lakes_preds$gam_preds-new_lakes_preds$spec_proportion)^2))
 
-lake_gamviz <- getViz(lake_m2)
+lake_gamviz <- getViz(lake_m3)
 
-check(lake_gamviz)
-#tmp[[4]] +xlim(0, 1)+geom_abline(intercept = 0, slope=1)
-
-lake_model_int <- function(x){round(binomial()$linkinv(x + as.numeric(coef(lake_m2)[1])), 2)} #add model intercept on original scale
+#add model intercept on original scale
+lake_model_int <- function(x){round(binomial()$linkinv(x + as.numeric(coef(lake_m2)[1])), 2)} 
 
 #print(plot(lake_gamviz, allTerms = T), pages = 1)
 
@@ -335,7 +353,7 @@ lake_p3 <- plot(sm(lake_gamviz, 3))+
   l_fitLine()+
   l_rug()+
   scale_y_continuous(labels = lake_model_int, limits = c(-2.5, 0.7))+
-  xlab("pH")+
+  xlab(expression(sqrt("Betweenness score")))+
   ylab("Lake:basin prop.")+
   theme_pub
 
@@ -344,11 +362,29 @@ lake_p4 <- plot(sm(lake_gamviz, 4))+
   l_fitLine()+
   l_rug()+
   scale_y_continuous(labels = lake_model_int, limits = c(-2.5, 0.7))+
-  xlab(expression(log[10]*"(Chl. a ["*mu*g*L^{-1}*"])"))+
+  xlab("pH")+
   ylab("Lake:basin prop.")+
   theme_pub
 
 lake_p5 <- plot(sm(lake_gamviz, 5))+
+  l_ciPoly()+
+  l_fitLine()+
+  l_rug()+
+  scale_y_continuous(labels = lake_model_int, limits = c(-2.5, 0.7))+
+  xlab(expression(log[10]*"(Chl. a ["*mu*g*L^{-1}*"])"))+
+  ylab("Lake:basin prop.")+
+  theme_pub
+
+lake_p6 <- plot(sm(lake_gamviz, 6))+
+  l_ciPoly()+
+  l_fitLine()+
+  l_rug()+
+  scale_y_continuous(labels = lake_model_int, limits = c(-2.5, 0.7))+
+  xlab(expression(sqrt("Distance to basin outlet (m)")))+
+  ylab("Lake:basin prop.")+
+  theme_pub
+
+lake_p7 <- plot(sm(lake_gamviz, 7))+
   l_fitRaster(pTrans = function(.p) ifelse(.p < 0.05, 1, 0.5), show.legend = FALSE)+
   l_points(shape=19, alpha = 0.5, size = 0.2)+
   scale_fill_gradient2(low = "blue", high = "orange", mid = "grey", na.value = "white")+
@@ -356,39 +392,62 @@ lake_p5 <- plot(sm(lake_gamviz, 5))+
   guides(fill = guide_colorbar(title = "Lake:basin prop."))+ 
   xlab("X")+
   ylab("Y")+
-  theme_pub
+  scale_y_continuous(labels = function(val){round(val/10^5, 1)}) +
+  scale_x_continuous(labels = function(val){round(val/10^4, 1)}) +
+  theme_bw() + 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        axis.text = element_text(colour = "white"), 
+        strip.background = element_rect(fill = "white"))
 
-lake_p6 <- data.frame(natural_lakes, pred = predict(lake_m2, type = "response")) %>% 
-  ggplot(aes(spec_proportion, pred))+
+lake_p8 <- data.frame(natural_lakes, pred = predict(lake_m2, type = "response")) %>% 
+  ggplot(aes(spec_proportion, pred, col = "Natural"))+
   geom_abline(slope = 1, intercept = 0, linetype = 3)+
-  geom_point(col = "coral", alpha = 0.5)+
-  geom_point(data = new_lakes_preds, aes(spec_proportion, gam_preds), alpha=0.5)+
-  xlim(0, 1)+
-  ylim(0, 1)+
-  ylab("Predicted lake:basin prop.")+
-  xlab("Observed lake:basin prop.")+
-  theme_pub
-
-lake_p7 <- new_lakes_preds %>%
-  mutate(connect_label = ifelse(lake_stream_connect_binary == 0, "Not connected", "Connected")) %>% 
-  ggplot(aes(age, resid_preds, shape = connect_label))+
-  geom_hline(yintercept = 0, linetype = 3)+
   geom_point()+
-  scale_shape_manual(values = c(1, 19))+
-  xlab("Lake age (years)")+
-  ylab("Residuals (pred. - obs.)")+
+  geom_point(data = new_lakes_preds, aes(spec_proportion, gam_preds, col = "New"))+
+  scale_color_manual(values = c("coral", viridisLite::viridis(1, begin = 0.5, end = 0.6)), name = "Lake group")+
+  xlim(0, 0.7)+
+  ylim(0, 0.7)+
+  ylab("Predicted")+
+  xlab("Observed")+
   theme_pub+
-  theme(legend.title = element_blank(), legend.position = c(0.8, 0.2))
+  theme(legend.position = c(0.3, 0.76))
 
-lake_gam_allplots <- gridPrint(lake_p1, lake_p2, lake_p3, lake_p4, lake_p5, lake_p6, lake_p7, ncol=2)
+lake_gam_allplots <- gridPrint(lake_p1, lake_p2, lake_p3, lake_p4, lake_p5, lake_p6, lake_p7, lake_p8, ncol=2)
 
 ggsave(paste0(getwd(), "/figures/lake_gam.png"), lake_gam_allplots, units = "mm", width = 174, height = 234)
 
 #Analysis of residuals 
 summary(lm(resid_preds~age+lake_stream_connect_binary, data = new_lakes_preds))
 
+residual_plot <- new_lakes_preds %>%
+  mutate(connect_label = ifelse(lake_stream_connect_binary == 0, "Not connected", "Connected")) %>% 
+  ggplot(aes(age, resid_preds, shape = connect_label))+
+  geom_hline(yintercept = 0, linetype = 3)+
+  geom_point()+
+  scale_shape_manual(values = c(1, 19))+
+  xlab("Lake age (years)")+
+  ylab("Lake model residuals (pred. - obs.)")+
+  theme_pub+
+  theme(legend.title = element_blank(), legend.position = c(0.75, 0.15))
+
+ggsave(paste0(getwd(), "/figures/lake_resids.png"), residual_plot, units = "mm", width = 84, height = 84)
 
 
+# #basin og lake lister til emil
+# #kun med brugte søer og basins
+# bas <- read_csv("basin_species_list.csv")
+# lak <- read_csv("lake_species_list.csv") %>% 
+#   filter(!is.na(fish_id))
+# 
+# lake_model_df %>% 
+#   select(site_id, basin_id = basin_id_fact) %>% 
+#   left_join(lak) %>%
+#   write_csv("lake_species_list_edit.csv")
+# 
+# bas %>% 
+#   filter(basin_id %in% pull(lake_model_df, basin_id_fact)) %>% 
+#   write_csv("basin_species_list_edit.csv")
 
 
 
