@@ -4,7 +4,7 @@ source("libs_and_funcs.R")
 #EU-DEM v1.1 (25 m resolution)
 #Denmark polygon
 #Danish lakes and streams polygon/line layers
-#Fish monitoring data ("Sø/Fisk/Længdevægt" and "Vandløb/Fisk/Længde" on www.odaforalle.dk dataset for lakes and streams respectively)
+#Fish monitoring data ("Sø/Fisk/Vægt", "Sø/Fisk/Garn" and "Vandløb/Fisk/Længde" on www.odaforalle.dk)
 #Lake chemistry and secchi depths
 #Lake submerged macrophyte data
 
@@ -21,7 +21,7 @@ dk_border <- dk_border_raw %>%
 st_write(dk_border, dsn = gis_database, layer = "dk_border", delete_layer = TRUE)#, dataset_options = "SPATIALITE=YES"
 
 #Lines of ice progression during last ice age (data from GEUS)
-ice_poly <- st_read(paste0(getwd(), "/data_raw/Isrande/Isrande_shape_format/Data/Isrand_poly.shp")) %>% 
+ice_poly <- st_read(paste0(getwd(), "/data_raw/Isrande/Isrand_poly.shp")) %>% 
   slice(1) %>% 
   st_transform(dk_epsg) %>% 
   st_crop(dk_border)
@@ -136,19 +136,20 @@ fish_species <- bind_rows(fish_lake_species, fish_stream_species, fish_newlakes)
   select(-lake_name)
 
 #Save list with lake names
-# bind_rows(fish_lake_species, fish_newlakes) %>% 
-#   select(system, site_id, lake_name) %>% 
-#   distinct() %>% 
-#   saveRDS(paste0(getwd(), "/data_raw/lake_names.rds"))
+bind_rows(fish_lake_species, fish_newlakes) %>%
+  select(system, site_id, lake_name) %>%
+  distinct() %>%
+  saveRDS(paste0(getwd(), "/data_raw/lake_names.rds"))
 
 #Identify fish species for further analysis
-#Valid/invalid fish species are edited manually and fish_id columns are added 
-#Editted list saved as "fish_unique_edit_final.xlsx"
-#fish_unique <- fish_species %>% distinct(name_local) %>% arrange(name_local) %>% na.omit()
-#write_csv(fish_unique, paste0(getwd(), "/data_raw/", "fish_unique.csv"))
+fish_unique <- fish_species %>%
+  distinct(name_local) %>%
+  arrange(name_local) %>%
+  na.omit()
+write_csv(fish_unique, paste0(getwd(), "/data_raw/", "fish_unique.csv"))
 
-#Select fish species for further analysis
-#Create fish species id
+#Editted list saved as "fish_unique_edit_final.xlsx"
+#Fish species for further analysis and create fish species id
 #Actions: 0=do_nothing, 1=remove_species, 2=remove_lake (brackish)
 fish_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/", "fish_unique_edit_final.xlsx")) %>% 
   select(name = name_to_use, name_novana = name_local_novana, name_atlas = latin_and_atlas,
@@ -184,15 +185,6 @@ fish_species_basin_sf <- fish_species_basin %>%
 
 st_write(fish_species_basin_sf, dsn = gis_database, layer = "fish_species_basin", delete_layer = TRUE)
 
-#Lakes for investigation is all the latest sampling for each lakes after 2006
-# fish_species_latest_survey <- fish_species_sub %>%
-#   filter(year >= 2006,
-#          system %in% c("lake", "newlake")) %>%
-#   select(system, site_id, year) %>%
-#   group_by(system, site_id) %>%
-#   summarise(year_max = max(year)) %>%
-#   ungroup()
-
 #Lakes for investigation is sample with highest richness after 2006
 fish_species_richest_survey <- fish_species_sub %>% 
   filter(year >= 2006,
@@ -221,7 +213,7 @@ fish_species_lakes_raw_sf <- fish_species_lakes_raw %>%
 
 st_write(fish_species_lakes_raw_sf, dsn = gis_database, layer = "fish_species_lakes_raw", delete_layer = TRUE)
 
-#Write files with with problems
+#Write files with with problems which should be reviewed and fixed manually
 #Multiple fish surveys in same lake polygon
 #Missing lake polygons
 #Problems and actions are listed in "Fishdata with no polygon and with multiple poly.xlsx"
@@ -361,7 +353,7 @@ lake_secchi_chem <- bind_rows(lake_chem_raw, lake_secchi_raw) %>%
 lake_secchi_chem_sf <- lake_secchi_chem %>% 
   st_as_sf(coords = c("Xutm_Euref89_Zone32", "Yutm_Euref89_Zone32"), crs = dk_epsg)
 
-#Write raw secchi_chem stations to .sqlite file and align coordinates
+#Write raw secchi_chem stations to .sqlite file and align coordinates with lake polygons
 # lake_secchi_chem_sf %>%
 #   select(site_id_2, name) %>%
 #   distinct(.keep_all = TRUE) %>%
@@ -380,7 +372,7 @@ sv_list2 <- lapply(sv_files[c(7, 8, 12)], function(path){read_table2(path, local
 sv_list <- c(sv_list1, sv_list2)
 
 #Join nescessary files
-#raw data
+#Raw data
 lake_plants_raw <- sv_list$sv_bertotal %>% 
   select(-X10) %>% 
   left_join(select(sv_list$std_enhed, enhed_std = kode, enhed = betegn)) %>% 
@@ -388,7 +380,7 @@ lake_plants_raw <- sv_list$sv_bertotal %>%
   left_join(sv_list$sv_dybdeomr) %>% 
   left_join(sv_list$sv_tilsyn2)
   
-#joined with station info
+#Joined with station info
 lake_plants_stat <- lake_plants_raw %>% 
   filter(dybdeomr_nr == 0 & bertype == 0) %>% 
   mutate(system = "lake", date = dmy(startdato), year = year(date),
@@ -397,12 +389,12 @@ lake_plants_stat <- lake_plants_raw %>%
   spread(param_unit, resultat) %>% 
   left_join(select(sv_list$so_cstation3, navn, recopl_id, utm_zone, utm_x, utm_y))
 
-#extract max depth from bathymetry data
+#Extract max depth from bathymetry data
 max_depth <- lake_plants_raw %>%
   group_by(recopl_id) %>%
   summarise(max_depth_m = max(til_dybde, na.rm = TRUE))
 
-#collect and clean plant data
+#Collect and clean plant data
 lake_plants <- lake_plants_stat %>% 
   mutate(zmean_m = Søvolumen_m3/Søreal_m2) %>% 
   left_join(max_depth) %>% 

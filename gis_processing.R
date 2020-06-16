@@ -3,14 +3,15 @@ source("libs_and_funcs.R")
 #Processing and combining spatial layers
 #Read layers from database
 #Calculate attributes for basins and lakes
-#st_layers(gis_database)
-
 dk_border <- st_read(dsn = gis_database, layer = "dk_border") 
 dk_iceage <- st_read(dsn = gis_database, layer = "dk_iceage") 
+
 dk_streams <- st_read(dsn = gis_database, layer = "dk_streams") %>% 
   mutate(stream_length_m = as.numeric(st_length(GEOMETRY)))
+
 dk_lakes <- st_read(dsn = gis_database, layer = "dk_lakes_edit") %>%
   rename(lake_area_m2 = area)
+
 fish_species_lakes <- st_read(dsn = gis_database, layer = "fish_species_lakes")
 fish_species_basin <- st_read(dsn = gis_database, layer = "fish_species_basin") 
 
@@ -62,8 +63,7 @@ dk_basins_clc <- dk_basins %>%
   add_column(basin_prop_arti = dk_basin_arti,
              basin_prop_agri = dk_basin_agri)
 
-#Compute stream length and lake area in basin 
-#Using centroids for now
+#Compute stream length and lake area for each basin 
 dk_streams_centroid <- st_centroid(select(dk_streams, stream_length_m))
 
 dk_lakes_centroid <- st_centroid(select(dk_lakes, lake_area_m2))
@@ -97,7 +97,7 @@ new_lakes_age <- read_xlsx(paste0(getwd(), "/data_raw/new_lakes_age.xlsx")) %>%
 dk_lakes_subset_age <- dk_lakes_subset %>% 
   st_join(new_lakes_age) 
 
-#Read additional lakes establishement years for join
+#Read additional lakes establishment years for join
 new_lakes_age_extra <- read_xlsx(paste0(getwd(), "/data_raw/all_model_data_names_EK.xlsx"), sheet = 2) %>% 
   filter(established_extra_extra != "NA") %>% 
   mutate(established_extra_extra = as.numeric(established_extra_extra))
@@ -139,7 +139,6 @@ fish_lake_species_count <- fish_species_lakes %>%
 
 #Merge plant data and secchi_chem data
 #Join secchi_chem and plants to lake polys
-
 #One lake (Tryggelev Nor) with wrong site_id_2
 #Remove "wrong" site_id_2, and replace "right" with "wrong"
 lake_secchi_chem_cor <- lake_secchi_chem %>% 
@@ -236,8 +235,6 @@ saveRDS(model_and_fig_data, paste0(getwd(), "/data_processed/model_and_fig_data.
 # all_model_data %>%
 #   left_join(lake_names) %>%
 #   write.csv2(paste0(getwd(), "/data_raw/all_model_data_names_03062020.csv"))
-
-
 
 # #udskrift af basin og lake arts data til emil
 # fish_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/", "fish_unique_edit_final.xlsx")) %>% 

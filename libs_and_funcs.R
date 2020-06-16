@@ -1,14 +1,9 @@
-library(sf);library(raster);library(rgdal);library(gdalUtils);library(tidyverse);library(readxl);library(lubridate)
-library(rgrass7);library(link2GI);library(patchwork);library(lwgeom);library(exactextractr)
-library(mapview)
-library(lme4)
-#library(MuMIn);library(ggeffects)
-library(corrplot)
-library(mgcv)
-#library(gratia)
-library(mgcViz)
+library(sf);library(raster);library(rgdal);library(gdalUtils);library(tidyverse);library(readxl);
+library(lubridate);library(rgrass7);library(link2GI);library(patchwork);library(lwgeom);
+library(exactextractr);library(mapview);library(corrplot);library(mgcv);library(mgcViz);
+#library(lme4)
 
-#Projection, as EPSG number, used for spatial analysis (UTM ZONE 32)
+#Danish projection, as EPSG number, used for spatial analysis (UTM ZONE 32)
 dk_epsg <- 25832
 
 #Path for spatial vector database
@@ -78,7 +73,7 @@ corvif <- function(dataz) {
   print(myvif(lm_mod))
 }
 
-#function for counting fish species caught per sampling, if na no fish caught but keep point
+#Function for counting fish species caught per sampling, if na no fish caught
 keep_na_for_zero_catch <- function(spec_col){
   if(all(is.na(spec_col[[1]]))){
     df <- tibble(col_name = NA)
