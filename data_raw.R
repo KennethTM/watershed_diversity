@@ -97,8 +97,8 @@ fish_stream_species <- fish_stream_raw %>%
   na.omit()
 
 #Fish in new lakes
-fish_newlakes_sheet1 <- read_xlsx(paste0(getwd(), "/data_raw/", "Samlet arter nye søer inkl kemi.xlsx"), sheet = 1)
-fish_newlakes_sheet3 <- read_xlsx(paste0(getwd(), "/data_raw/", "Samlet arter nye søer inkl kemi.xlsx"), sheet = 3) %>% 
+fish_newlakes_sheet1 <- read_xlsx(paste0(getwd(), "/data_raw/", "Samlet arter nye søer inkl kemi_EK.xlsx"), sheet = 1)
+fish_newlakes_sheet3 <- read_xlsx(paste0(getwd(), "/data_raw/", "Samlet arter nye søer inkl kemi_EK.xlsx"), sheet = 3) %>% 
   select(-x, -y, -`UTM zone`) %>% 
   rename(Lokalitetsnavn = sø)
 
@@ -128,9 +128,8 @@ saveRDS(chem_newlakes, paste0(getwd(), "/data_raw/chem_newlakes.rds"))
 
 fish_newlakes <- fish_and_chem_newlakes %>% 
   select(system, site_id, lake_name, year_established = established,
-         Xutm_Euref89_Zone32 = x, Yutm_Euref89_Zone32 = y, name_novana = Dansk_navn) %>% 
-  distinct() %>% 
-  mutate(year = 2018) #Avg year of sampling in new lakes
+         Xutm_Euref89_Zone32 = x, Yutm_Euref89_Zone32 = y, name_novana = Dansk_navn, year) %>% 
+  distinct()
 
 fish_species <- bind_rows(fish_lake_species, fish_stream_species, fish_newlakes) %>% 
   select(-lake_name)
@@ -142,11 +141,11 @@ bind_rows(fish_lake_species, fish_newlakes) %>%
   saveRDS(paste0(getwd(), "/data_raw/lake_names.rds"))
 
 #Identify fish species for further analysis
-fish_unique <- fish_species %>%
-  distinct(name_local) %>%
-  arrange(name_local) %>%
-  na.omit()
-write_csv(fish_unique, paste0(getwd(), "/data_raw/", "fish_unique.csv"))
+# fish_unique <- fish_species %>%
+#   distinct(name_local) %>%
+#   arrange(name_local) %>%
+#   na.omit()
+# write_csv(fish_unique, paste0(getwd(), "/data_raw/", "fish_unique.csv"))
 
 #Editted list saved as "fish_unique_edit_final.xlsx"
 #Fish species for further analysis and create fish species id

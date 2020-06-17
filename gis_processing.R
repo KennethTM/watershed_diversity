@@ -49,7 +49,8 @@ dk_clc <- gdalwarp(srcfile = paste0(getwd(), "/data_raw/dk_clc_2018_raw.tif"),
                    co = "COMPRESS=LZW", 
                    tr = c(100, 100), 
                    r = "near",
-                   output_Raster = TRUE)
+                   output_Raster = TRUE,
+                   overwrite = TRUE)
 
 dk_clc_arti <- (dk_clc %in% c(111, 112, 121, 122, 123, 124, 131, 132, 133, 141, 142))
 dk_clc_agri <- (dk_clc %in% c(211, 212, 213))

@@ -417,7 +417,7 @@ ggsave(paste0(getwd(), "/figures/lake_gam.png"), lake_gam_allplots, units = "mm"
 
 #Analysis of residuals 
 mod_resid <- lm(resid_preds~age*lake_stream_connect_binary, data = new_lakes_preds)
-plot(mod_resid)
+#plot(mod_resid)
 summary(mod_resid)
 anova(mod_resid)
 
