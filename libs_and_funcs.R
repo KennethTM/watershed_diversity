@@ -1,7 +1,7 @@
 library(sf);library(raster);library(rgdal);library(gdalUtils);library(tidyverse);library(readxl);
 library(lubridate);library(rgrass7);library(link2GI);library(patchwork);library(lwgeom);
 library(exactextractr);library(mapview);library(corrplot);library(mgcv);library(mgcViz);
-#library(lme4)
+library(grainscape); library(igraph)
 
 #Danish projection, as EPSG number, used for spatial analysis (UTM ZONE 32)
 dk_epsg <- 25832
@@ -17,6 +17,17 @@ theme_pub <- theme_bw() +
         axis.text = element_text(colour = "black"), 
         strip.background = element_rect(fill = "white"))
 theme_set(theme_pub)
+
+#Function for counting fish species caught per sampling, if na no fish caught
+keep_na_for_zero_catch <- function(spec_col){
+  if(all(is.na(spec_col[[1]]))){
+    df <- tibble(col_name = NA)
+    names(df) <- names(spec_col)
+    return(df)
+  }else{
+    return(na.omit(spec_col))
+  }
+}
 
 #Code to calculate variance inflation factor
 #From Zuur et al MEE 2009
@@ -73,13 +84,3 @@ corvif <- function(dataz) {
   print(myvif(lm_mod))
 }
 
-#Function for counting fish species caught per sampling, if na no fish caught
-keep_na_for_zero_catch <- function(spec_col){
-  if(all(is.na(spec_col[[1]]))){
-    df <- tibble(col_name = NA)
-    names(df) <- names(spec_col)
-    return(df)
-  }else{
-    return(na.omit(spec_col))
-  }
-}

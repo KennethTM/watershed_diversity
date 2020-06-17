@@ -1,9 +1,6 @@
 #Network modeling using grainscape and igraph
-#http://www.alexchubaty.com/grainscape/articles/grainscape_vignette.html
 
 source("libs_and_funcs.R")
-library(grainscape)
-library(igraph)
 
 #Load some data
 model_and_fig_data <- readRDS(paste0(getwd(), "/data_processed/model_and_fig_data.rds"))
@@ -15,19 +12,19 @@ dk_dem <- raster(paste0(getwd(), "/data_processed/dk_dem_25.tif"))
 dk_dem_bbox <- as.numeric(st_bbox(dk_dem))
 rast_res <- c(10, 10)
 
-#buffer stream lines because networking algorithm does behave well in diagonal connected raster cells (4 vs 8 connected?)
+#Buffer stream lines because networking algorithm does behave well in diagonal connected raster cells (4 vs 8 connected?)
 dk_streams_buf <- st_read(dsn = gis_database, layer = "dk_streams") %>% 
   st_buffer(5)
 st_write(dk_streams_buf, paste0(getwd(), "/data_raw/dk_streams_buffer.sqlite"), delete_dsn = TRUE)
 
-#rasterize streams (network derived from dem) and lakes
+#Rasterize streams (network derived from dem) and lakes
 gdal_rasterize(src_datasource = paste0(getwd(), "/data_raw/dk_streams_buffer.sqlite"),
                dst_filename = paste0(getwd(), "/data_raw/dk_streams.tif"),
                burn = 2, at = TRUE, a_nodata = 0, tap = TRUE,
                te = dk_dem_bbox, tr = rast_res,
                co = "COMPRESS=LZW")
 
-#only rasterize lakes above 1000 m2
+#Only rasterize lakes above 1000 m2
 gdal_rasterize(src_datasource = gis_database, l = "dk_lakes_edit",
                dst_filename = paste0(getwd(), "/data_raw/dk_lakes.tif"),
                burn = 1, at = TRUE, a_nodata = 0, tap = TRUE,
@@ -42,7 +39,7 @@ rast_streams <- raster(paste0(getwd(), "/data_raw/dk_streams.tif"))
 basin_idx <- sort(unique(na.omit(lake_df$basin_id)))
 basin_result_list <- vector("list", length = length(basin_idx))
 
-#calculate network (stream and lakes) statistics for each basin 
+#Calculate network (stream and lakes) statistics for each basin 
 for(i in basin_idx){
   print(paste0("Starting basin id ", i, " at ", Sys.time()))
   basin <- dk_basins %>% 
@@ -87,7 +84,7 @@ for(i in basin_idx){
 
 basin_result_df <- do.call(rbind, basin_result_list)
 
-#multiply degree_weight by 5 to get meters (cost 2)
+#Multiply degree_weight by 5 to get meters (cost 2)
 basin_result_df_sub <- basin_result_df %>% 
   st_drop_geometry() %>% 
   select(site_id, degree, degree_weight, between) 

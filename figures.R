@@ -4,7 +4,9 @@ source("libs_and_funcs.R")
 model_and_fig_data <- readRDS(paste0(getwd(), "/data_processed/model_and_fig_data.rds"))
 
 basin_data <- model_and_fig_data[[1]] %>% 
-  filter(!is.na(basin_sum_lake_area_m2)) 
+  filter(!is.na(basin_sum_lake_area_m2))
+
+#Percent cover of DK's area
 #(sum(st_drop_geometry(basin_data)$basin_area_m2)*10^-9)/(42531525552*10^-9)
 
 all_model_data <- model_and_fig_data[[2]]
@@ -21,6 +23,7 @@ dk_iceage_cut <- st_intersection(dk_iceage %>% st_cast("LINESTRING"), dk_border)
   st_collection_extract("LINESTRING")
 
 #Basin richness plots
+
 basin_richness_freq <- basin_data %>% 
   st_drop_geometry() %>% 
   ggplot(aes(n_spec_basin))+

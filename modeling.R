@@ -209,7 +209,7 @@ corrplot.mixed(cond_preds_cor)
 corvif(lake_preds)
 
 #Binomial model
-#all basin with <10 species excluded
+#All basin with <10 species excluded
 lake_model_df <- lake_preds %>% 
   bind_cols(select(lake_df, site_id, age, basin_id_fact, spec_proportion, n_spec_basin, lake_ice_covered, lake_stream_connect_binary)) %>% 
   filter(n_spec_basin >= 10) %>% 
@@ -217,7 +217,7 @@ lake_model_df <- lake_preds %>%
 
 summary(lake_model_df)
 
-#split data into two sets: natural lakes or lakes more than 100 years old and new lakes (less than 100 years old)
+#Split data into two sets: natural lakes or lakes more than 100 years old and new lakes (less than 100 years old)
 natural_lakes <- lake_model_df %>% 
   filter(is.na(age) | age > 100) %>% 
   select(-age) %>% 
@@ -227,7 +227,8 @@ new_lakes <- lake_model_df %>%
   filter(age < 100) %>% 
   na.omit()
 
-#check if data from plant monitoring has significant effects or if they should be dropped to include more observations
+#Check if data from plant monitoring has significant effects or if they should be dropped to include more observations
+#(variable are dropped from lake_model_df above)
 # include_plant_data <- gam(spec_proportion ~ s(elevation) + s(lake_area_log10) + s(lake_stream_connect) +
 #                             s(degree_weight)+s(between)+
 #                             s(pH_pH) + s(chla_ug_l)+
@@ -242,10 +243,10 @@ new_lakes <- lake_model_df %>%
 #                           data = natural_lakes, select = TRUE, gamma = 1.4)
 # summary(include_plant_data)
 
-#no apparent signifincant effects of tn_mg_l, tp_mg_l, plant_area_perc, zmax_m and alk_meq_l
-#remove these variables to get more observations for modeling
+#No apparent signifincant effects of tn_mg_l, tp_mg_l, plant_area_perc, zmax_m and alk_meq_l
+#Remove these variables to get more observations for modeling
 
-#fit gam again with random intercept
+#Fit gam again with random intercept
 lake_m0 <- gam(spec_proportion ~ s(elevation) + s(lake_area_log10) + s(lake_stream_connect) +
                  s(degree_weight)+s(between)+
                  s(pH_pH) + s(chla_ug_l)+
@@ -260,8 +261,9 @@ lake_m0 <- gam(spec_proportion ~ s(elevation) + s(lake_area_log10) + s(lake_stre
 summary(lake_m0)
 gam.check(lake_m0)
 
-#test for under-overdispersion, values close to 1 indicate no problems
+#Test for under-overdispersion, values close to 1 indicate no problems, also examine diagnostic plots
 deviance(lake_m0)/df.residual(lake_m0)
+#gam.check(lake_m0)
 
 lake_m1 <- gam(spec_proportion ~ s(elevation) + s(lake_area_log10) + s(lake_stream_connect) +
                  s(degree_weight)+s(between)+
@@ -276,11 +278,11 @@ lake_m1 <- gam(spec_proportion ~ s(elevation) + s(lake_area_log10) + s(lake_stre
                data = natural_lakes, select = TRUE, gamma = 1.4)
 
 summary(lake_m1)
-gam.check(lake_m1)
+#gam.check(lake_m1)
 
-#quasi distribution improves diagnostic plots
+#Quasi distribution improves diagnostic plots
 
-#refit without terms which were penalized to zero
+#Fit without terms which were penalized to zero
 lake_m2 <- gam(spec_proportion ~ s(elevation) + s(lake_area_log10) +
                  s(between)+
                  s(pH_pH) + s(chla_ug_l)+
@@ -294,7 +296,7 @@ lake_m2 <- gam(spec_proportion ~ s(elevation) + s(lake_area_log10) +
 
 summary(lake_m2)
 
-#refit without non-significant parametric terms 
+#Fit without non-significant parametric terms 
 lake_m3 <- gam(spec_proportion ~ s(elevation) + s(lake_area_log10) +
                  s(between)+
                  s(pH_pH) + s(chla_ug_l)+
@@ -309,7 +311,7 @@ summary(lake_m3)
 
 gam.check(lake_m3)
 
-#keep model 3
+#Keep model 3
 
 #Use model to predict richness for new lakes
 new_lakes_preds <- new_lakes %>%
@@ -323,11 +325,12 @@ pred_rmse <- sqrt(mean((new_lakes_preds$gam_preds-new_lakes_preds$spec_proportio
 
 lake_gamviz <- getViz(lake_m3)
 
-#add model intercept on original scale
+#Add model intercept on original scale
 lake_model_int <- function(x){round(binomial()$linkinv(x + as.numeric(coef(lake_m2)[1])), 2)} 
 
 #print(plot(lake_gamviz, allTerms = T), pages = 1)
 
+#Create plots
 lake_p1 <- plot(sm(lake_gamviz, 1))+
   l_ciPoly()+
   l_fitLine()+
@@ -415,7 +418,7 @@ lake_gam_allplots <- gridPrint(lake_p1, lake_p2, lake_p3, lake_p4, lake_p5, lake
 
 ggsave(paste0(getwd(), "/figures/lake_gam.png"), lake_gam_allplots, units = "mm", width = 174, height = 234)
 
-#Analysis of residuals 
+#Analysis of residuals from new lake observations
 mod_resid <- lm(resid_preds~age*lake_stream_connect_binary, data = new_lakes_preds)
 #plot(mod_resid)
 summary(mod_resid)
@@ -434,191 +437,17 @@ residual_plot <- new_lakes_preds %>%
 
 ggsave(paste0(getwd(), "/figures/lake_resids.png"), residual_plot, units = "mm", width = 84, height = 84)
 
-
-
-
-
-
-
-# #basin og lake lister til emil
-# #kun med brugte søer og basins
-# bas <- read_csv("basin_species_list.csv")
-# lak <- read_csv("lake_species_list.csv") %>% 
+#Load and add to basin and lake species lists for species specific analysis
+#Only include lake and basins used in modeling
+# bas <- read_csv(paste0(getwd(), "/data_raw/basin_species_list.csv"))
+# lak <- read_csv(paste0(getwd(), "/data_raw/lake_species_list.csv")) %>% 
 #   filter(!is.na(fish_id))
 # 
 # lake_model_df %>% 
 #   select(site_id, basin_id = basin_id_fact) %>% 
 #   left_join(lak) %>%
-#   write_csv("lake_species_list_edit.csv")
+#   write_csv(paste0(getwd(), "/data_raw/lake_species_list_edit.csv"))
 # 
 # bas %>% 
 #   filter(basin_id %in% pull(lake_model_df, basin_id_fact)) %>% 
-#   write_csv("basin_species_list_edit.csv")
-
-
-
-
-
-
-
-
-
-# #Fit ordinary glm
-# global_glm <- glm(spec_proportion ~ elevation + lake_area_log10 + lake_stream_connect + 
-#                     #degree_weight+between+
-#                     pH_pH + 
-#                     #chla_ug_l+
-#                     #tp_mg_l + tn_mg_l+plant_area_perc+zmax_m+alk_meq_l+
-#                     #lake_ice_covered+
-#                     lake_stream_connect_binary,
-#                  weights=n_spec_basin, 
-#                  data=natural_lakes, 
-#                  family="binomial")
-# summary(global_glm)
-# 
-# #Fit glmm with basin_id as random
-# global_glmm <- glmer(spec_proportion ~ elevation + lake_area_log10 + lake_stream_connect + 
-#                        #degree_weight+between+
-#                        pH_pH + 
-#                        #chla_ug_l+
-#                        #tp_mg_l + tn_mg_l+plant_area_perc+zmax_m+alk_meq_l+
-#                        #lake_ice_covered+
-#                        lake_stream_connect_binary+(1|basin_id_fact),
-#                   weights=n_spec_basin, 
-#                   data=natural_lakes, 
-#                   family="binomial")
-# summary(global_glmm)
-# 
-# #Test for inclusion of random effect
-# #p-value 0.0519. Use random effect as LRT test is conservative
-# anova(global_glmm, global_glm)
-# 
-# #Refit glmm with better accuracy 
-# glmm_0 <- update(global_glmm, nAGQ = 4)
-#   
-# summary(glmm_0)
-# 
-# #Check for overdspersion (residual deviance / df) should approximate 1 
-# #https://esajournals.onlinelibrary.wiley.com/doi/full/10.1890/10-0340.1
-# deviance(glmm_0)/df.residual(glmm_0) #deviance 242.9 in summary - same conclusion
-# 
-# #Another function, same conclusion
-# #https://bbolker.github.io/mixedmodels-misc/glmmFAQ.html
-# overdisp_fun <- function(model) {
-#   rdf <- df.residual(model)
-#   rp <- residuals(model,type="pearson")
-#   Pearson.chisq <- sum(rp^2)
-#   prat <- Pearson.chisq/rdf
-#   pval <- pchisq(Pearson.chisq, df=rdf, lower.tail=FALSE)
-#   c(chisq=Pearson.chisq,ratio=prat,rdf=rdf,p=pval)
-# }
-# 
-# overdisp_fun(glmm_0)
-# 
-# #Backwards elimination of variables untill all terms are significant
-# drop1(glmm_0, test = "Chisq")
-# glmm_1 <- update(glmm_0, . ~ . -secchi_depth_m)
-# 
-# drop1(glmm_1, test = "Chisq")
-# glmm_2 <- update(glmm_1, . ~ . -lake_dev_ind)
-# 
-# drop1(glmm_2, test = "Chisq")
-# glmm_3 <- update(glmm_2, . ~ . -lake_ice_covered)
-# 
-# drop1(glmm_3, test = "Chisq")
-# glmm_4 <- update(glmm_3, . ~ . -between)
-# 
-# drop1(glmm_4, test = "Chisq")
-# glmm_5 <- update(glmm_4, . ~ . -degree)
-# 
-# drop1(glmm_5, test = "Chisq")
-# glmm_6 <- update(glmm_5, . ~ . -chla_ug_l)
-# 
-# drop1(glmm_6, test = "Chisq")
-# 
-# #include squared terms
-# glmm_7 <- update(glmm_6, . ~ . +pH_pH:alk_meq_l) #+I(pH_pH^2)
-# drop1(glmm_7, test = "Chisq")
-# 
-# 
-# #calculate goodness of fit
-# # glm_6 <- glm(spec_proportion ~ elevation + pH_pH + basin_area_log10 + lake_area_log10 +  
-# #                lake_stream_connect_binary + I(pH_pH^2) + I(lake_area_log10^2),
-# #                   weights=n_spec_basin, 
-# #                   data=model_df_scale, 
-# #                   family="binomial")
-# # 
-# # library(piecewiseSEM)
-# # rsquared(glm_6)
-# 
-# r.squaredGLMM(glmm_7)
-# 
-# r2.corr.mer <- function(m){
-#   lmfit <-  lm(model.response(model.frame(m)) ~ fitted(m))
-#   summary(lmfit)$r.squared
-# }
-# r2.corr.mer(glmm_7)
-# 
-# #Validate model
-# plot(glmm_7)
-# 
-# conf_intervals <- confint(glmm_7, method = "profile")
-# 
-# deviance(glmm_7)/df.residual(glmm_7) 
-# 
-# #Plots
-# ph <- ggeffect(glmm_7, terms = "pH_pH [all]")
-# elev <- ggeffect(glmm_7, terms = "elevation [all]")
-# #basin_lake_area <- ggeffect(glmm_7, terms = "log10_basin_sum_lake_area_m2 [all]")
-# #lake_area <- ggeffect(glmm_7, terms = "lake_area_log10 [all]")
-# connect <- ggeffect(glmm_7, terms = "lake_stream_connect_binary")
-# 
-# ph_plot <- ggplot(data = tbl_df(ph), aes(x, predicted)) +
-#   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), fill = "coral")+
-#   geom_line() +
-#   geom_point(data = model_df_scale, aes(pH_pH, spec_proportion), alpha = 0.2)+
-#   xlab("pH")+
-#   ylab("Richness")
-# 
-# elev_plot <- ggplot(data = tbl_df(elev), aes(x, predicted)) +
-#   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), fill = "coral")+
-#   geom_line() +
-#   geom_point(data = model_df_scale, aes(elevation, spec_proportion), alpha = 0.2)+
-#   xlab("Elevation")+
-#   ylab("Richness")
-# 
-# basin_lake <- ggplot(data = tbl_df(basin_lake_area), aes(x, predicted)) +
-#   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), fill = "coral")+
-#   geom_line() +
-#   geom_point(data = model_df_scale, aes(log10_basin_sum_lake_area_m2, spec_proportion), alpha = 0.2)+
-#   xlab("Basin area")+
-#   ylab("Richness")
-# 
-# lake_area_plot <- ggplot(data = tbl_df(lake_area), aes(x, predicted)) +
-#   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), fill = "coral")+
-#   geom_line() +
-#   geom_point(data = model_df_scale, aes(lake_area_log10, spec_proportion), alpha = 0.2)+
-#   xlab("Lake area")+
-#   ylab("Richness")
-# 
-# connect_plot <- ggplot(data = tbl_df(connect), aes(x, predicted)) +
-#   geom_linerange(aes(x = x, ymin = conf.low, ymax = conf.high), col = "coral", size = 2)+
-#   geom_point(aes(y=predicted))+
-#   geom_jitter(data = model_df_scale, aes(lake_stream_connect_binary, spec_proportion), alpha = 0.2,width = 0.25)+
-#   xlab("Stream connect")+
-#   ylab("Richness")
-# 
-# obs_pred_plot <- model_df_scale %>% 
-#   mutate(fitted_values = fitted(glmm_5)) %>% 
-#   ggplot(aes(fitted_values, spec_proportion)) +
-#   geom_abline(slope=1, intercept = 0, linetype = 2)+
-#   geom_point(alpha=0.2)+
-#   ylim(0, 1)+
-#   xlim(0, 1)+
-#   ylab("Observed richness")+
-#   xlab("Predicted richness")
-# 
-# glmer_plot <- ph_plot+elev_plot+basin_lake+lake_area_plot+connect_plot+obs_pred_plot+plot_layout(ncol = 2)
-# 
-# ggsave(paste0(getwd(), "/figures/glmer_plot.png"), glmer_plot, units = "mm", width = 174, height = 200)
-# 
+#   write_csv(paste0(getwd(), "/data_raw/basin_species_list_edit.csv"))

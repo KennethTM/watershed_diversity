@@ -5,8 +5,9 @@ source("libs_and_funcs.R")
 #Denmark polygon
 #Danish lakes and streams polygon/line layers
 #Fish monitoring data ("Sø/Fisk/Vægt", "Sø/Fisk/Garn" and "Vandløb/Fisk/Længde" on www.odaforalle.dk)
-#Lake chemistry and secchi depths
-#Lake submerged macrophyte data
+#Lake chemistry and secchi depths on www.odaforalle.dk
+#Lake submerged macrophyte data on www.odaforalle.dk
+#Line of ice progression during last ice age from GEUS
 
 #Write vector files for further processing to gis_database
 
@@ -64,7 +65,7 @@ ogr2ogr(paste0(getwd(), "/data_raw/DK_WatercourseLink.gml"),
         select = "gml_id")
 
 #Read downloaded fish data, clean and save to gis_database
-#Format to columns: system, site_id, year, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, name_local
+#Format to columns: system, site_id, year, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, name_novana
 #For lake fish monitoring both weigth and net tables are needed to also include zero-catch samples
 fish_weight_lake <- read_xlsx(paste0(getwd(), "/data_raw/", "odaforalle_fish_weight_lake.xlsx"))
 fish_net_lake <- read_xlsx(paste0(getwd(), "/data_raw/", "odaforalle_fish_net_lake.xlsx"))
@@ -141,11 +142,11 @@ bind_rows(fish_lake_species, fish_newlakes) %>%
   saveRDS(paste0(getwd(), "/data_raw/lake_names.rds"))
 
 #Identify fish species for further analysis
-# fish_unique <- fish_species %>%
-#   distinct(name_local) %>%
-#   arrange(name_local) %>%
-#   na.omit()
-# write_csv(fish_unique, paste0(getwd(), "/data_raw/", "fish_unique.csv"))
+fish_unique <- fish_species %>%
+  distinct(name_novana) %>%
+  arrange(name_novana) %>%
+  na.omit()
+write_csv(fish_unique, paste0(getwd(), "/data_raw/", "fish_unique.csv"))
 
 #Editted list saved as "fish_unique_edit_final.xlsx"
 #Fish species for further analysis and create fish species id

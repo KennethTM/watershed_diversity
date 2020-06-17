@@ -232,12 +232,11 @@ saveRDS(model_and_fig_data, paste0(getwd(), "/data_processed/model_and_fig_data.
 #Write files with fish data and lake name to files for further inspection
 #Lake names and id's
 # lake_names <- readRDS(paste0(getwd(), "/data_raw/lake_names.rds"))
-# 
 # all_model_data %>%
 #   left_join(lake_names) %>%
 #   write.csv2(paste0(getwd(), "/data_raw/all_model_data_names_03062020.csv"))
 
-# #udskrift af basin og lake arts data til emil
+#Write basin and lake species lists for species specific analysis
 # fish_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/", "fish_unique_edit_final.xlsx")) %>% 
 #   select(name = name_to_use, name_novana = name_local_novana, name_atlas = latin_and_atlas,
 #          fish_id = ID, `how(0=do_nothing)(1=remove_species)(2=remove_lake)`)
@@ -247,8 +246,8 @@ saveRDS(model_and_fig_data, paste0(getwd(), "/data_processed/model_and_fig_data.
 #   select(site_id, fish_id) %>% 
 #   left_join(fish_unique_edit) %>% 
 #   filter(site_id %in% filter(all_model_data_dist, !is.na(basin_id))$site_id) %>% 
-#   write_csv("lake_species_list.csv")
+#   write_csv(paste0(getwd(), "/data_raw/lake_species_list.csv"))
 # 
 # bind_rows(fish_atlas, fish_monitoring) %>% 
 #   left_join(fish_unique_edit) %>% 
-#   write_csv("basin_species_list.csv")
+#   write_csv(paste0(getwd(), "/data_raw/basin_species_list.csv"))
