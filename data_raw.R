@@ -19,7 +19,7 @@ dk_border <- dk_border_raw %>%
   st_crop(xmin = 8, ymin = 54.56, xmax = 14, ymax = 57.76) %>% 	
   st_transform(dk_epsg)	
 
-st_write(dk_border, dsn = gis_database, layer = "dk_border", delete_layer = TRUE)#, dataset_options = "SPATIALITE=YES"
+st_write(dk_border, dsn = gis_database, layer = "dk_border", delete_layer = TRUE)
 
 #Lines of ice progression during last ice age (data from GEUS)
 ice_poly <- st_read(paste0(getwd(), "/data_raw/Isrande/Isrand_poly.shp")) %>% 
@@ -122,26 +122,28 @@ fish_newlakes_raw_zone33_to_zone32 <- fish_newlakes_raw_zone33 %>%
 fish_and_chem_newlakes <- bind_rows(fish_newlakes_raw_zone32, fish_newlakes_raw_zone33_to_zone32) %>% 
   rename(lake_name = Lokalitetsnavn)
 
-chem_newlakes <- fish_and_chem_newlakes %>% 
-  select(system, site_id, established, secchi_depth_m:tn_mg_l) %>% 
-  distinct()
-saveRDS(chem_newlakes, paste0(getwd(), "/data_raw/chem_newlakes.rds"))
-
 fish_newlakes <- fish_and_chem_newlakes %>% 
   select(system, site_id, lake_name, year_established = established,
          Xutm_Euref89_Zone32 = x, Yutm_Euref89_Zone32 = y, name_novana = Dansk_navn, year) %>% 
   distinct()
 
+#Chemistry in new lakes
+chem_newlakes <- fish_and_chem_newlakes %>% 
+  select(system, site_id, established, secchi_depth_m:tn_mg_l) %>% 
+  distinct()
+saveRDS(chem_newlakes, paste0(getwd(), "/data_raw/chem_newlakes.rds"))
+
+#Fish species from both lakes and streams monitoring data and new lakes
 fish_species <- bind_rows(fish_lake_species, fish_stream_species, fish_newlakes) %>% 
   select(-lake_name)
 
-#Save list with lake names
+#Save list with lake names for each site_id
 bind_rows(fish_lake_species, fish_newlakes) %>%
   select(system, site_id, lake_name) %>%
   distinct() %>%
   saveRDS(paste0(getwd(), "/data_raw/lake_names.rds"))
 
-#Identify fish species for further analysis
+#Write unique fish species to file to provide each species with unique id
 fish_unique <- fish_species %>%
   distinct(name_novana) %>%
   arrange(name_novana) %>%
@@ -151,10 +153,9 @@ write_csv(fish_unique, paste0(getwd(), "/data_raw/", "fish_unique.csv"))
 #Editted list saved as "fish_unique_edit_final.xlsx"
 #Fish species for further analysis and create fish species id
 #Actions: 0=do_nothing, 1=remove_species, 2=remove_lake (brackish)
-fish_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/", "fish_unique_edit_final.xlsx")) %>% 
+fish_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/", "fish_unique_edit_EK.xlsx")) %>% 
   select(name = name_to_use, name_novana = name_local_novana, name_atlas = latin_and_atlas,
-         fish_id = ID, action = `how(0=do_nothing)(1=remove_species)(2=remove_lake)`) %>% 
-  select(-name_atlas)
+         fish_id = ID, action = `how(0=do_nothing)(1=remove_species)(2=remove_lake)`)
 
 invalid_lakes <- fish_species %>% 
   filter(name_novana %in% filter(fish_unique_edit, action == 2)$name_novana) %>% 
@@ -163,7 +164,8 @@ invalid_lakes <- fish_species %>%
 
 valid_fish_species <- fish_unique_edit %>% 
   filter(action == 0 & !is.na(name)) %>% 
-  na.omit()
+  na.omit() %>% 
+  select(-name_atlas)
 
 #Join to table with species id's, keep valid fish species and NA
 fish_species_sub <- fish_species %>% 
@@ -185,6 +187,17 @@ fish_species_basin_sf <- fish_species_basin %>%
 
 st_write(fish_species_basin_sf, dsn = gis_database, layer = "fish_species_basin", delete_layer = TRUE)
 
+#Read atlas fish data, join with names and write to file
+atlas_raw <- read_xlsx(paste0(getwd(), "/data_raw/atlasdata_oplande.xlsx")) %>% 
+  mutate(name_atlas = gsub(" ", "_", species_latin)) %>% 
+  left_join(select(fish_unique_edit, name_atlas, fish_id, action)) %>% 
+  filter(action == 0)
+
+atlas_raw %>% 
+  select(basin_id, fish_id) %>% 
+  distinct() %>% 
+  saveRDS(paste0(getwd(), "/data_raw/atlasdata_ids.rds"))
+  
 #Lakes for investigation is sample with highest richness after 2006
 fish_species_richest_survey <- fish_species_sub %>% 
   filter(year >= 2006,

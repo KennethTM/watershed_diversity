@@ -104,10 +104,26 @@ new_lakes_age_extra <- read_xlsx(paste0(getwd(), "/data_raw/all_model_data_names
   mutate(established_extra_extra = as.numeric(established_extra_extra))
 
 #Read data from danish fish atlas
-fish_atlas <- read_delim(paste0(getwd(), "/data_raw/Atlas_data_danish_latin_id_basin.csv"), delim = " ") %>% 
-  select(basin_id, fish_id = ID) %>% 
-  na.omit() %>% 
-  distinct()
+fish_atlas <- readRDS(paste0(getwd(), "/data_raw/atlasdata_ids.rds"))
+
+# fish_atlas <- read_delim(paste0(getwd(), "/data_raw/Atlas_data_danish_latin_id_basin.csv"), delim = " ") %>% 
+#   select(basin_id, fish_id = ID) %>% 
+#   na.omit() %>% 
+#   distinct()
+
+# #Fix fish ids in atlas data by joining with name
+# fish_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/", "fish_unique_edit_final.xlsx")) %>% 
+#   select(name = name_to_use, fish_id = ID, action = `how(0=do_nothing)(1=remove_species)(2=remove_lake)`)
+# 
+# fish_atlas_raw <- read_delim(paste0(getwd(), "/data_raw/Atlas_data_danish_latin_id_basin.csv"), delim = " ") %>% 
+#   select(basin_id, name = species_danish) %>% 
+#   na.omit() %>% 
+#   distinct() %>% 
+#   mutate(name = gsub(" ", "_", name))
+# 
+# fish_atlas <- left_join(fish_atlas_raw, fish_unique_edit) %>% 
+#   filter(action == 0) %>% 
+#   select(basin_id, fish_id)
 
 #Basin fish data from monitoring
 fish_monitoring <- fish_species_basin %>% 
@@ -234,20 +250,21 @@ saveRDS(model_and_fig_data, paste0(getwd(), "/data_processed/model_and_fig_data.
 # lake_names <- readRDS(paste0(getwd(), "/data_raw/lake_names.rds"))
 # all_model_data %>%
 #   left_join(lake_names) %>%
-#   write.csv2(paste0(getwd(), "/data_raw/all_model_data_names_03062020.csv"))
+#   write.csv2(paste0(getwd(), "/data_raw/all_model_data_names.csv"))
 
 #Write basin and lake species lists for species specific analysis
-# fish_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/", "fish_unique_edit_final.xlsx")) %>% 
+# fish_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/", "fish_unique_edit_EK.xlsx")) %>%
 #   select(name = name_to_use, name_novana = name_local_novana, name_atlas = latin_and_atlas,
-#          fish_id = ID, `how(0=do_nothing)(1=remove_species)(2=remove_lake)`)
+#          fish_id = ID, action = `how(0=do_nothing)(1=remove_species)(2=remove_lake)`)
 # 
-# fish_species_lakes %>% 
-#   st_drop_geometry() %>% 
-#   select(site_id, fish_id) %>% 
-#   left_join(fish_unique_edit) %>% 
-#   filter(site_id %in% filter(all_model_data_dist, !is.na(basin_id))$site_id) %>% 
+# fish_species_lakes %>%
+#   st_drop_geometry() %>%
+#   select(site_id, fish_id) %>%
+#   na.omit() %>% 
+#   left_join(fish_unique_edit) %>%
+#   #filter(site_id %in% filter(all_model_data_dist, !is.na(basin_id))$site_id) %>%
 #   write_csv(paste0(getwd(), "/data_raw/lake_species_list.csv"))
 # 
-# bind_rows(fish_atlas, fish_monitoring) %>% 
-#   left_join(fish_unique_edit) %>% 
+# bind_rows(fish_atlas, fish_monitoring) %>%
+#   left_join(fish_unique_edit) %>%
 #   write_csv(paste0(getwd(), "/data_raw/basin_species_list.csv"))

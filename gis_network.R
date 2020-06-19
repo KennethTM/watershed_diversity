@@ -43,10 +43,10 @@ basin_result_list <- vector("list", length = length(basin_idx))
 for(i in basin_idx){
   print(paste0("Starting basin id ", i, " at ", Sys.time()))
   basin <- dk_basins %>% 
-    filter(basin_id == 206)
+    filter(basin_id == i)
   
   basin_sites <- lake_df %>% 
-    filter(basin_id == 206)
+    filter(basin_id == i)
   
   basin_lakes <- crop(rast_lakes, basin)
   basin_streams <- crop(rast_streams, basin)
@@ -62,17 +62,21 @@ for(i in basin_idx){
   mpg_degree <- degree(mpg_graph@mpg)
   mpg_degree_weight <- strength(mpg_graph@mpg, weights = edge_attr(mpg_graph@mpg)$lcpPerimWeight)
   mpg_between <- betweenness(mpg_graph@mpg)
+  mpg_degree_norm <- degree(mpg_graph@mpg, normalized = TRUE)
+  mpg_between_norm <- betweenness(mpg_graph@mpg, normalized = TRUE)
   
   df_metrics <- data.frame(vertex_attr(mpg_graph@mpg),
                            degree = mpg_degree, 
                            degree_weight = mpg_degree_weight,
-                           between = mpg_between)
+                           between = mpg_between,
+                           degree_norm = mpg_degree_norm,
+                           between_norm = mpg_between_norm)
   
   basin_sites_patch_id <- raster::extract(mpg_graph@patchId, as(basin_sites, "Spatial"))
   
   basin_sites_with_attr <- basin_sites %>% 
     add_column(patch_id = basin_sites_patch_id) %>% 
-    left_join(select(df_metrics, patch_id = patchId, degree, degree_weight, between), by = "patch_id")
+    left_join(select(df_metrics, patch_id = patchId, degree, degree_weight, between, degree_norm, between_norm), by = "patch_id")
   
   i_n <- which(basin_idx == i)
 
@@ -87,6 +91,6 @@ basin_result_df <- do.call(rbind, basin_result_list)
 #Multiply degree_weight by 5 to get meters (cost 2)
 basin_result_df_sub <- basin_result_df %>% 
   st_drop_geometry() %>% 
-  select(site_id, degree, degree_weight, between) 
+  select(site_id, degree, degree_weight, between, degree_norm, between_norm)
 
 saveRDS(basin_result_df_sub, paste0(getwd(), "/data_processed/gis_network_attr.rds"))
