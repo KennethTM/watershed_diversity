@@ -204,7 +204,7 @@ corvif(lake_preds)
 #Binomial model
 #All basins with <10 species excluded
 lake_model_df <- lake_preds %>% 
-  bind_cols(select(lake_df, site_id, age, basin_id_fact, spec_proportion, n_spec_basin, lake_ice_covered, lake_stream_connect_binary)) %>% 
+  bind_cols(select(lake_df, site_id, age, basin_id_fact, spec_proportion, n_spec_basin, lake_ice_covered, lake_stream_connect_binary)) %>%
   filter(n_spec_basin >= 10) %>% 
   select(-tn_mg_l, -tp_mg_l, -plant_area_perc, -zmax_m, -alk_meq_l) 
 
@@ -414,7 +414,6 @@ ggsave(paste0(getwd(), "/figures/lake_gam.png"), lake_gam_allplots, units = "mm"
 mod_resid <- lm(resid_preds~age*lake_stream_connect_binary, data = new_lakes_preds)
 #plot(mod_resid)
 summary(mod_resid)
-anova(mod_resid)
 
 residual_plot <- new_lakes_preds %>%
   mutate(connect_label = ifelse(lake_stream_connect_binary == 0, "Not connected", "Connected")) %>% 
@@ -429,6 +428,16 @@ residual_plot <- new_lakes_preds %>%
 
 ggsave(paste0(getwd(), "/figures/lake_resids.png"), residual_plot, units = "mm", width = 84, height = 84)
 
+#t-test of residuals and lake ages
+hist(new_lakes_preds$resid_preds)
+t.test(new_lakes_preds$resid_preds)
+
+lake_spec_test <- bind_rows(add_column(natural_lakes, system = "natural"), 
+          add_column(new_lakes, system = "new")) %>% 
+  mutate(n_spec_lake = spec_proportion*n_spec_basin) 
+hist(lake_spec_test[lake_spec_test$system == "new",]$n_spec_lake)
+hist(lake_spec_test[lake_spec_test$system == "natural",]$n_spec_lake)
+wilcox.test(n_spec_lake~system, data = lake_spec_test)
 
 #Load and add to basin and lake species lists for species specific analysis
 #Only include lake and basins used in modeling
@@ -490,13 +499,14 @@ nat_lake_freq <- left_join(bas_sub, lak_sub) %>%
 
 spec_freq_plot <- bind_rows(add_column(nat_lake_freq, system = "natural"), 
                             add_column(new_lake_freq, system = "new")) %>% 
-  left_join(lak_per_fish) %>% 
+  left_join(lak_per_spec) %>% 
   left_join(bas_per_spec) %>%
   na.omit() %>% 
   mutate(label = gsub("_", " ", name_atlas),
          lake_cat = ifelse(system == "natural", "Natural", "New"),
+         lake_cat_fact = factor(ifelse(lake_cat == "Natural", "Natural", "New"), levels = c("New", "Natural")),
          label_n_bas = paste0(label, " (", n_bas_spec, ")")) %>% 
-  ggplot(aes(x = reorder(label_n_bas, spec_mean), y = spec_mean, col = lake_cat, size = n_lake_spec))+
+  ggplot(aes(x = reorder(label_n_bas, spec_mean), y = spec_mean, col = lake_cat_fact, size = n_lake_spec))+
   geom_point()+
   scale_colour_manual(values = c(viridisLite::viridis(1, begin = 0.5, end = 0.6), "coral"), name = "Lake age (years)")+
   scale_size_area(name = "Occurrences", n.breaks = 4)+
