@@ -15,6 +15,7 @@ theme_pub <- theme_bw() +
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(), 
         axis.text = element_text(colour = "black"), 
+        panel.border = element_rect(fill = NA, colour = "black"),
         strip.background = element_rect(fill = "white"))
 theme_set(theme_pub)
 

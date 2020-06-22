@@ -398,12 +398,13 @@ lake_p8 <- data.frame(natural_lakes, pred = predict(lake_m2, type = "response"))
   geom_point()+
   geom_point(data = new_lakes_preds, aes(spec_proportion, gam_preds, col = "New"))+
   scale_color_manual(values = c("coral", viridisLite::viridis(1, begin = 0.5, end = 0.6)), name = "Lake group")+
-  xlim(0, 0.7)+
-  ylim(0, 0.7)+
+  xlim(0, 1)+
+  ylim(0, 1)+
   ylab("Predicted")+
   xlab("Observed")+
   theme_pub+
-  theme(legend.position = c(0.3, 0.76))
+  theme(legend.position =  c(0.80, 0.30),
+        legend.background = element_rect(colour = "black", size = 0.25)) #c(0.3, 0.76)
 
 lake_gam_allplots <- gridPrint(lake_p1, lake_p2, lake_p3, lake_p4, lake_p5, lake_p6, lake_p8, ncol=2)
 
@@ -424,10 +425,9 @@ residual_plot <- new_lakes_preds %>%
   xlab("Lake age (years)")+
   ylab("Lake model residuals (pred. - obs.)")+
   theme_pub+
-  theme(legend.title = element_blank(), legend.position = c(0.75, 0.15))
+  theme(legend.title = element_blank(), legend.position = "bottom")
 
 ggsave(paste0(getwd(), "/figures/lake_resids.png"), residual_plot, units = "mm", width = 84, height = 84)
-
 
 
 #Load and add to basin and lake species lists for species specific analysis
@@ -436,8 +436,9 @@ fish_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/", "fish_unique_edit_EK
   select(name = name_to_use, name_novana = name_local_novana, name_atlas = latin_and_atlas,
          fish_id = ID, action = `how(0=do_nothing)(1=remove_species)(2=remove_lake)`) %>% 
   filter(action == 0) %>% 
-  select(name, fish_id) %>% 
-  distinct()
+  select(name_atlas, fish_id) %>% 
+  distinct() %>% 
+  slice(-25)
   
 bas <- read_csv(paste0(getwd(), "/data_raw/basin_species_list.csv"))
 
@@ -456,24 +457,56 @@ bas_sub <- bas %>%
   distinct()
 
 lak_per_bas <- lak_sub %>% 
-  select(basin_id, site_id) %>% 
+  select(system, basin_id, site_id) %>% 
   distinct() %>% 
-  group_by(basin_id) %>% 
+  group_by(system, basin_id) %>% 
   summarise(n_lake = n())
 
-spec_freq <- left_join(bas_sub, lak_sub) %>%
-  #group_by(system, fish_id, basin_id) %>% 
-  group_by(fish_id, basin_id) %>% 
-  summarise(n_occur = sum(!is.na(site_id))) %>% 
-  left_join(lak_per_bas) %>% 
-  summarise(spec_mean = mean(n_occur/n_lake)) %>% 
-  left_join(fish_unique_edit)
+lak_per_spec <- lak_sub %>%
+  group_by(system, fish_id) %>%
+  summarise(n_lake_spec = n())
 
-spec_freq %>% 
+bas_per_spec <- bas_sub %>%
+  group_by(fish_id) %>%
+  summarise(n_bas_spec = n())
+
+new_lake_freq <- left_join(bas_sub, lak_sub) %>%
+  filter(system == "new" | is.na(system)) %>% 
+  group_by(fish_id, basin_id) %>% 
+  summarise(n_occur = sum(!is.na(site_id))) %>%
+  left_join(filter(lak_per_bas, system == "new")) %>%
   na.omit() %>% 
-  #ggplot(aes(reorder(name, spec_mean), spec_mean, col = system))+
-  ggplot(aes(reorder(name, spec_mean), spec_mean))+
+  summarise(spec_mean = mean(n_occur/n_lake)) %>% 
+  left_join(fish_unique_edit) 
+
+nat_lake_freq <- left_join(bas_sub, lak_sub) %>%
+  filter(system == "natural" | is.na(system)) %>% 
+  group_by(fish_id, basin_id) %>% 
+  summarise(n_occur = sum(!is.na(site_id))) %>%
+  left_join(filter(lak_per_bas, system == "natural")) %>%
+  na.omit() %>% 
+  summarise(spec_mean = mean(n_occur/n_lake)) %>% 
+  left_join(fish_unique_edit) 
+
+spec_freq_plot <- bind_rows(add_column(nat_lake_freq, system = "natural"), 
+                            add_column(new_lake_freq, system = "new")) %>% 
+  left_join(lak_per_fish) %>% 
+  left_join(bas_per_spec) %>%
+  na.omit() %>% 
+  mutate(label = gsub("_", " ", name_atlas),
+         lake_cat = ifelse(system == "natural", "Natural", "New"),
+         label_n_bas = paste0(label, " (", n_bas_spec, ")")) %>% 
+  ggplot(aes(x = reorder(label_n_bas, spec_mean), y = spec_mean, col = lake_cat, size = n_lake_spec))+
   geom_point()+
-  scale_y_continuous(breaks = seq(0, 0.9, 0.1))+
+  scale_colour_manual(values = c(viridisLite::viridis(1, begin = 0.5, end = 0.6), "coral"), name = "Lake age (years)")+
+  scale_size_area(name = "Occurrences", n.breaks = 4)+
+  scale_y_continuous(breaks = seq(0, 1, 0.1), limits = c(0, 1))+
   coord_flip()+
-  theme(panel.grid.major.y = element_line(size = 0.1, colour = "black"))
+  xlab("Species")+
+  ylab("Average frequency")+
+  theme(panel.grid.major.y = element_line(size = 0.5, colour = "grey"),
+        legend.position = c(0.75, 0.24),
+        axis.text.y = element_text(face = "italic"),
+        legend.background = element_rect(colour = "black", size = 0.25))
+
+ggsave(paste0(getwd(), "/figures/lake_spec_freq.png"), spec_freq_plot, units = "mm", width = 129, height = 150)
