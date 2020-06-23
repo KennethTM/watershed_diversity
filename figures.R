@@ -3,9 +3,6 @@ source("libs_and_funcs.R")
 #Data for figures
 model_and_fig_data <- readRDS(paste0(getwd(), "/data_processed/model_and_fig_data.rds"))
 
-basin_data <- model_and_fig_data[[1]] %>% 
-  filter(!is.na(basin_sum_lake_area_m2))
-
 #Percent cover of DK's area
 #(sum(st_drop_geometry(basin_data)$basin_area_m2)*10^-9)/(42531525552*10^-9)
 
@@ -23,6 +20,8 @@ dk_iceage_cut <- st_intersection(dk_iceage %>% st_cast("LINESTRING"), dk_border)
   st_collection_extract("LINESTRING")
 
 #Basin richness plots
+basin_data <- model_and_fig_data[[1]] %>% 
+  filter(!is.na(basin_sum_lake_area_m2))
 
 basin_richness_freq <- basin_data %>% 
   st_drop_geometry() %>% 
@@ -43,6 +42,7 @@ basin_richness_map <- dk_basins %>%
 basin_fig <- basin_richness_map + basin_richness_freq + plot_layout(ncol = 1) + plot_annotation(tag_levels = "A")
 
 ggsave(paste0(getwd(), "/figures/basin_richness.png"), basin_fig, units = "mm", width = 129, height = 150)
+ggsave(paste0(getwd(), "/figures/basin_richness.svg"), basin_fig, units = "mm", width = 129, height = 150)
 
 #Lake richness plots
 
@@ -90,3 +90,4 @@ lake_fig <- lake_map_age + lake_spec_prop + lake_spec_prop_basin_rich +
   plot_annotation(tag_levels = "A")
 
 ggsave(paste0(getwd(), "/figures/lake_richness.png"), lake_fig, units = "mm", width = 129, height = 200)
+ggsave(paste0(getwd(), "/figures/lake_richness.svg"), lake_fig, units = "mm", width = 129, height = 200)

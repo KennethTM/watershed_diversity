@@ -91,7 +91,7 @@ p2 <- plot(sm(gamviz, 2))+
   l_rug()+
   scale_y_continuous(labels = add_model_int, limits = c(-1.3, 1.3))+
   xlab(expression(log[10]*"(basin lake area [m"^{2}*"])"))+
-  ylab("Basin richness")+
+  ylab("")+
   theme_pub
 
 p3 <- plot(sm(gamviz, 3))+
@@ -109,7 +109,7 @@ p4 <- plot(sm(gamviz, 4))+
   l_rug()+
   scale_y_continuous(labels = add_model_int, limits = c(-1.3, 1.3))+
   xlab(expression(sqrt("prop. artificial area")))+
-  ylab("Basin richness")+
+  ylab("")+
   theme_pub
 
 p5 <- plot(sm(gamviz, 5))+
@@ -143,7 +143,7 @@ p7 <- plot(pterm(gamviz, 1))+
   scale_y_continuous(labels = add_model_int, limits = c(-1.3, 1.3))+
   scale_x_discrete(labels = c("Not ice covered", "Ice covered"))+
   xlab("Ice covered")+
-  ylab("Basin richness")+
+  ylab("")+
   theme_pub
 
 p8 <- data.frame(basin_gam_df, pred = predict(m0, type = "response")) %>% 
@@ -152,13 +152,14 @@ p8 <- data.frame(basin_gam_df, pred = predict(m0, type = "response")) %>%
   geom_point(alpha = 0.25)+
   xlim(0, 42)+
   ylim(0, 42)+
-  ylab("Predicted basin richness")+
-  xlab("Observed basin richness")+
+  ylab("Predicted")+
+  xlab("Observed")+
   theme_pub
   
-basin_gam_allplots <- gridPrint(p1, p2, p3, p4, p5, p6, p7, p8, ncol=2)
+basin_gam_allplots <- gridPrint(p1, p2, p3, p4, p5, p7, p6, p8, ncol=2)
 
 ggsave(paste0(getwd(), "/figures/basin_gam.png"), basin_gam_allplots, units = "mm", width = 174, height = 234)
+ggsave(paste0(getwd(), "/figures/basin_gam.svg"), basin_gam_allplots, units = "mm", width = 174, height = 234)
 
 #Lake level modeling
 
@@ -337,7 +338,7 @@ lake_p2 <- plot(sm(lake_gamviz, 2))+
   l_rug()+
   scale_y_continuous(labels = lake_model_int, limits = c(-2.6, 1.3))+
   xlab(expression(log[10]*"(lake area [m"^{2}*"])"))+
-  ylab("Lake:basin prop.")+
+  ylab("")+
   theme_pub
 
 lake_p3 <- plot(sm(lake_gamviz, 3))+
@@ -355,7 +356,7 @@ lake_p4 <- plot(sm(lake_gamviz, 4))+
   l_rug()+
   scale_y_continuous(labels = lake_model_int, limits = c(-2.6, 1.3))+
   xlab("pH")+
-  ylab("Lake:basin prop.")+
+  ylab("")+
   theme_pub
 
 lake_p5 <- plot(sm(lake_gamviz, 5))+
@@ -373,7 +374,7 @@ lake_p6 <- plot(sm(lake_gamviz, 6))+
   l_rug()+
   scale_y_continuous(labels = lake_model_int, limits = c(-2.6, 1.3))+
   xlab(expression(sqrt("Distance to basin outlet (m)")))+
-  ylab("Lake:basin prop.")+
+  ylab("")+
   theme_pub
 
 # lake_p7 <- plot(sm(lake_gamviz, 7))+
@@ -409,6 +410,7 @@ lake_p8 <- data.frame(natural_lakes, pred = predict(lake_m2, type = "response"))
 lake_gam_allplots <- gridPrint(lake_p1, lake_p2, lake_p3, lake_p4, lake_p5, lake_p6, lake_p8, ncol=2)
 
 ggsave(paste0(getwd(), "/figures/lake_gam.png"), lake_gam_allplots, units = "mm", width = 174, height = 234)
+ggsave(paste0(getwd(), "/figures/lake_gam.svg"), lake_gam_allplots, units = "mm", width = 174, height = 234)
 
 #Analysis of residuals from new lake observations
 mod_resid <- lm(resid_preds~age*lake_stream_connect_binary, data = new_lakes_preds)
@@ -419,7 +421,7 @@ residual_plot <- new_lakes_preds %>%
   mutate(connect_label = ifelse(lake_stream_connect_binary == 0, "Not connected", "Connected")) %>% 
   ggplot(aes(age, resid_preds, shape = connect_label))+
   geom_hline(yintercept = 0, linetype = 3)+
-  geom_point()+
+  geom_point(col = viridisLite::viridis(1, begin = 0.5, end = 0.6))+
   scale_shape_manual(values = c(1, 19))+
   xlab("Lake age (years)")+
   ylab("Lake model residuals (pred. - obs.)")+
@@ -427,6 +429,7 @@ residual_plot <- new_lakes_preds %>%
   theme(legend.title = element_blank(), legend.position = "bottom")
 
 ggsave(paste0(getwd(), "/figures/lake_resids.png"), residual_plot, units = "mm", width = 84, height = 84)
+ggsave(paste0(getwd(), "/figures/lake_resids.svg"), residual_plot, units = "mm", width = 84, height = 84)
 
 #t-test of residuals and lake ages
 hist(new_lakes_preds$resid_preds)
@@ -520,3 +523,14 @@ spec_freq_plot <- bind_rows(add_column(nat_lake_freq, system = "natural"),
         legend.background = element_rect(colour = "black", size = 0.25))
 
 ggsave(paste0(getwd(), "/figures/lake_spec_freq.png"), spec_freq_plot, units = "mm", width = 129, height = 150)
+ggsave(paste0(getwd(), "/figures/lake_spec_freq.svg"), spec_freq_plot, units = "mm", width = 129, height = 150)
+
+#lake stats table
+bind_rows(add_column(natural_lakes, system = "natural"), 
+          add_column(new_lakes, system = "new")) %>% 
+  mutate(basin_id = as.numeric(as.character(basin_id_fact))) %>% 
+  select(system, basin_id, site_id) %>% 
+  left_join(lake_df) %>% 
+  group_by(system) %>% 
+  summarise_if(is.numeric, list("mean" = mean, "min" = min, "max" = max), na.rm = TRUE) %>%
+  write_csv("lake_vars_table.csv")
