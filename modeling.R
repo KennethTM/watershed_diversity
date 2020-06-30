@@ -82,7 +82,7 @@ p1 <- plot(sm(gamviz, 1))+
   l_rug()+
   scale_y_continuous(labels = add_model_int, limits = c(-1.3, 1.3))+
   xlab("Elevation range (m)")+
-  ylab("Basin richness")+
+  ylab("")+
   theme_pub
 
 p2 <- plot(sm(gamviz, 2))+
@@ -91,7 +91,7 @@ p2 <- plot(sm(gamviz, 2))+
   l_rug()+
   scale_y_continuous(labels = add_model_int, limits = c(-1.3, 1.3))+
   xlab(expression(log[10]*"(basin lake area [m"^{2}*"])"))+
-  ylab("")+
+  ylab("Basin richness")+
   theme_pub
 
 p3 <- plot(sm(gamviz, 3))+
@@ -100,7 +100,7 @@ p3 <- plot(sm(gamviz, 3))+
   l_rug()+
   scale_y_continuous(labels = add_model_int, limits = c(-1.3, 1.3))+
   xlab(expression(log[10]*"(basin stream length + 1 [m])"))+
-  ylab("Basin richness")+
+  ylab("")+
   theme_pub
 
 p4 <- plot(sm(gamviz, 4))+
@@ -109,7 +109,7 @@ p4 <- plot(sm(gamviz, 4))+
   l_rug()+
   scale_y_continuous(labels = add_model_int, limits = c(-1.3, 1.3))+
   xlab(expression(sqrt("prop. artificial area")))+
-  ylab("")+
+  ylab("Basin richness")+
   theme_pub
 
 p5 <- plot(sm(gamviz, 5))+
@@ -118,7 +118,7 @@ p5 <- plot(sm(gamviz, 5))+
   l_rug()+
   scale_y_continuous(labels = add_model_int, limits = c(-1.3, 1.3))+
   xlab(expression(sqrt("prop. agricultural area")))+
-  ylab("Basin richness")+
+  ylab("")+
   theme_pub
 
 p6 <- plot(sm(gamviz, 6))+
@@ -142,8 +142,8 @@ p7 <- plot(pterm(gamviz, 1))+
   l_ciBar()+
   scale_y_continuous(labels = add_model_int, limits = c(-1.3, 1.3))+
   scale_x_discrete(labels = c("Not ice covered", "Ice covered"))+
-  xlab("Ice covered")+
-  ylab("")+
+  xlab("")+
+  ylab("Basin richness")+
   theme_pub
 
 p8 <- data.frame(basin_gam_df, pred = predict(m0, type = "response")) %>% 
@@ -156,10 +156,12 @@ p8 <- data.frame(basin_gam_df, pred = predict(m0, type = "response")) %>%
   xlab("Observed")+
   theme_pub
   
-basin_gam_allplots <- gridPrint(p1, p2, p3, p4, p5, p7, p6, p8, ncol=2)
+basin_plot_list <- lapply(list(p2, p3, p4, p5, p7, p1, p6), function(x){x$ggObj})
 
-ggsave(paste0(getwd(), "/figures/basin_gam.png"), basin_gam_allplots, units = "mm", width = 174, height = 234)
-ggsave(paste0(getwd(), "/figures/basin_gam.svg"), basin_gam_allplots, units = "mm", width = 174, height = 234)
+basin_gam_plot <- wrap_plots(basin_plot_list) + p8 + plot_layout(ncol = 2) + plot_annotation(tag_levels = "A")
+
+ggsave(paste0(getwd(), "/figures/basin_gam.png"), basin_gam_plot, units = "mm", width = 174, height = 234)
+ggsave(paste0(getwd(), "/figures/basin_gam.svg"), basin_gam_plot, units = "mm", width = 174, height = 234)
 
 #Lake level modeling
 
@@ -329,7 +331,7 @@ lake_p1 <- plot(sm(lake_gamviz, 1))+
   l_rug()+
   scale_y_continuous(labels = lake_model_int, limits = c(-2.6, 1.3))+
   xlab("Elevation (m)")+
-  ylab("Lake:basin prop.")+
+  ylab("Richness ratio")+
   theme_pub
 
 lake_p2 <- plot(sm(lake_gamviz, 2))+
@@ -347,7 +349,7 @@ lake_p3 <- plot(sm(lake_gamviz, 3))+
   l_rug()+
   scale_y_continuous(labels = lake_model_int, limits = c(-2.6, 1.3))+
   xlab(expression(sqrt("Betweenness")))+
-  ylab("Lake:basin prop.")+
+  ylab("Richness ratio")+
   theme_pub
 
 lake_p4 <- plot(sm(lake_gamviz, 4))+
@@ -356,7 +358,7 @@ lake_p4 <- plot(sm(lake_gamviz, 4))+
   l_rug()+
   scale_y_continuous(labels = lake_model_int, limits = c(-2.6, 1.3))+
   xlab("pH")+
-  ylab("")+
+  ylab("Richness ratio")+
   theme_pub
 
 lake_p5 <- plot(sm(lake_gamviz, 5))+
@@ -365,7 +367,7 @@ lake_p5 <- plot(sm(lake_gamviz, 5))+
   l_rug()+
   scale_y_continuous(labels = lake_model_int, limits = c(-2.6, 1.3))+
   xlab(expression(log[10]*"(Chl. a ["*mu*g*L^{-1}*"])"))+
-  ylab("Lake:basin prop.")+
+  ylab("")+
   theme_pub
 
 lake_p6 <- plot(sm(lake_gamviz, 6))+
@@ -407,10 +409,12 @@ lake_p8 <- data.frame(natural_lakes, pred = predict(lake_m2, type = "response"))
   theme(legend.position =  c(0.80, 0.30),
         legend.background = element_rect(colour = "black", size = 0.25)) #c(0.3, 0.76)
 
-lake_gam_allplots <- gridPrint(lake_p1, lake_p2, lake_p3, lake_p4, lake_p5, lake_p6, lake_p8, ncol=2)
+lake_plot_list <- lapply(list(lake_p4, lake_p6, lake_p1, lake_p2, lake_p3, lake_p5), function(x){x$ggObj})
 
-ggsave(paste0(getwd(), "/figures/lake_gam.png"), lake_gam_allplots, units = "mm", width = 174, height = 234)
-ggsave(paste0(getwd(), "/figures/lake_gam.svg"), lake_gam_allplots, units = "mm", width = 174, height = 234)
+lake_gam_plot <- wrap_plots(lake_plot_list) + lake_p8 + plot_layout(ncol = 2) + plot_annotation(tag_levels = "A")
+
+ggsave(paste0(getwd(), "/figures/lake_gam.png"), lake_gam_plot, units = "mm", width = 174, height = 234)
+ggsave(paste0(getwd(), "/figures/lake_gam.svg"), lake_gam_plot, units = "mm", width = 174, height = 234)
 
 #Analysis of residuals from new lake observations
 mod_resid <- lm(resid_preds~age*lake_stream_connect_binary, data = new_lakes_preds)
@@ -438,9 +442,17 @@ t.test(new_lakes_preds$resid_preds)
 lake_spec_test <- bind_rows(add_column(natural_lakes, system = "natural"), 
           add_column(new_lakes, system = "new")) %>% 
   mutate(n_spec_lake = spec_proportion*n_spec_basin) 
+
 hist(lake_spec_test[lake_spec_test$system == "new",]$n_spec_lake)
 hist(lake_spec_test[lake_spec_test$system == "natural",]$n_spec_lake)
 wilcox.test(n_spec_lake~system, data = lake_spec_test)
+
+hist(lake_spec_test[lake_spec_test$system == "new",]$spec_proportion)
+hist(lake_spec_test[lake_spec_test$system == "natural",]$spec_proportion)
+wilcox.test(spec_proportion~system, data = lake_spec_test)
+
+#richness_ratio_test <- glm(spec_proportion~system, data = lake_spec_test, weights = n_spec_basin, family="binomial")
+#summary(richness_ratio_test)
 
 #Load and add to basin and lake species lists for species specific analysis
 #Only include lake and basins used in modeling
@@ -532,5 +544,5 @@ bind_rows(add_column(natural_lakes, system = "natural"),
   select(system, basin_id, site_id) %>% 
   left_join(lake_df) %>% 
   group_by(system) %>% 
-  summarise_if(is.numeric, list("mean" = mean, "min" = min, "max" = max), na.rm = TRUE) %>%
+  summarise_if(is.numeric, list("mean" = mean, "min" = min, "max" = max), na.rm = TRUE) %>% View()
   write_csv("lake_vars_table.csv")

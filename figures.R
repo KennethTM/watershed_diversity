@@ -31,13 +31,18 @@ basin_richness_freq <- basin_data %>%
   ylab("Frequency")+
   xlab("Basin richness")
 
+xlabs <- seq(8, 12, 1)
+ylabs <- seq(54.5, 57.5, 0.5)
+
 basin_richness_map <- dk_basins %>% 
   left_join(st_drop_geometry(select(basin_data, basin_id, n_spec_basin))) %>% 
   ggplot()+
   geom_sf(data = dk_border, fill = NA, col = "black")+
   geom_sf(aes(fill = n_spec_basin), col = "black", size = 0.25)+
   geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "red", linetype = 1, show.legend = FALSE)+
-  scale_fill_viridis_c(na.value="white", option = "D", name = "Basin richness", direction = -1, begin = 0.2)
+  scale_fill_viridis_c(na.value="white", option = "D", name = "Basin richness", direction = -1, begin = 0.2)+
+  scale_x_continuous(breaks = xlabs, labels = paste0(xlabs,'°W')) +
+  scale_y_continuous(breaks = ylabs, labels = paste0(ylabs,'°N'))
 
 basin_fig <- basin_richness_map + basin_richness_freq + plot_layout(ncol = 1) + plot_annotation(tag_levels = "A")
 
@@ -59,13 +64,18 @@ lake_map_age_df <- all_model_data %>%
          -year_established) %>% 
   na.omit()
   
+xlabs <- seq(8, 12, 1)
+ylabs <- seq(54.5, 57.5, 0.5)
+
 lake_map_age <- lake_map_age_df %>% 
   ggplot() +
   geom_sf(data = dk_border, col = "black", fill = NA)+
   geom_sf(aes(col = lake_age_bins), size = 0.7)+
   geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "red", linetype = 1, show.legend = FALSE)+
   scale_colour_manual(values = c(viridisLite::viridis(4, direction = -1), "coral"), name = "Lake age (years)")+
-  guides(linetype = guide_legend(title = NULL, order = 2), colour = guide_legend(order = 1))
+  guides(linetype = guide_legend(title = NULL, order = 2), colour = guide_legend(order = 1))+
+  scale_x_continuous(breaks = xlabs, labels = paste0(xlabs,'°W')) +
+  scale_y_continuous(breaks = ylabs, labels = paste0(ylabs,'°N'))
 
 lake_spec_prop <- lake_map_age_df %>% 
   st_drop_geometry() %>% 
@@ -74,14 +84,14 @@ lake_spec_prop <- lake_map_age_df %>%
   geom_histogram(aes(spec_prop), fill = NA, col = "black", binwidth = 0.04)+
   scale_color_manual(values = c(viridisLite::viridis(1, begin = 0.5, end = 0.6), "coral"), name = "Lake group")+
   ylab("Frequency")+
-  xlab("Lake:basin richness ratio")
+  xlab("Richness ratio")
 
 lake_spec_prop_basin_rich <- lake_map_age_df %>% 
   st_drop_geometry() %>% 
   ggplot(aes(y=spec_prop, x = n_spec_basin, col = basin_area_m2)) +
   geom_vline(xintercept = 10, linetype = 3)+
   geom_point(size = 0.7)+
-  ylab("Lake:basin richness ratio")+
+  ylab("Richness ratio")+
   xlab("Basin species richness")+
   scale_colour_viridis_c(trans = "log10", name = expression(log[10]*"(basin area [m"^{2}*"])"), option = "D", begin = 0.1)
 
