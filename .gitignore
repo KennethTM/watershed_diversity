@@ -6,3 +6,4 @@ code_snippets.R
 data_raw/
 data_processed/
 gis_grass_database/
+figures/*.svg

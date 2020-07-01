@@ -82,7 +82,7 @@ p1 <- plot(sm(gamviz, 1))+
   l_rug()+
   scale_y_continuous(labels = add_model_int, limits = c(-1.3, 1.3))+
   xlab("Elevation range (m)")+
-  ylab("")+
+  ylab("Basin richness")+
   theme_pub
 
 p2 <- plot(sm(gamviz, 2))+
@@ -143,7 +143,7 @@ p7 <- plot(pterm(gamviz, 1))+
   scale_y_continuous(labels = add_model_int, limits = c(-1.3, 1.3))+
   scale_x_discrete(labels = c("Not ice covered", "Ice covered"))+
   xlab("")+
-  ylab("Basin richness")+
+  ylab("")+
   theme_pub
 
 p8 <- data.frame(basin_gam_df, pred = predict(m0, type = "response")) %>% 
@@ -156,7 +156,7 @@ p8 <- data.frame(basin_gam_df, pred = predict(m0, type = "response")) %>%
   xlab("Observed")+
   theme_pub
   
-basin_plot_list <- lapply(list(p2, p3, p4, p5, p7, p1, p6), function(x){x$ggObj})
+basin_plot_list <- lapply(list(p2, p3, p4, p5, p1, p7, p6), function(x){x$ggObj})
 
 basin_gam_plot <- wrap_plots(basin_plot_list) + p8 + plot_layout(ncol = 2) + plot_annotation(tag_levels = "A")
 
@@ -417,9 +417,11 @@ ggsave(paste0(getwd(), "/figures/lake_gam.png"), lake_gam_plot, units = "mm", wi
 ggsave(paste0(getwd(), "/figures/lake_gam.svg"), lake_gam_plot, units = "mm", width = 174, height = 234)
 
 #Analysis of residuals from new lake observations
-mod_resid <- lm(resid_preds~age*lake_stream_connect_binary, data = new_lakes_preds)
+mod_resid_0 <- lm(resid_preds~age*lake_stream_connect_binary-1, data = new_lakes_preds)
+mod_resid_1 <- lm(resid_preds~age+lake_stream_connect_binary-1, data = new_lakes_preds)
+anova(mod_resid_1, mod_resid_0)
 #plot(mod_resid)
-summary(mod_resid)
+summary(mod_resid_1)
 
 residual_plot <- new_lakes_preds %>%
   mutate(connect_label = ifelse(lake_stream_connect_binary == 0, "Not connected", "Connected")) %>% 
