@@ -522,11 +522,14 @@ spec_freq_plot <- bind_rows(add_column(nat_lake_freq, system = "natural"),
   mutate(label = gsub("_", " ", name_atlas),
          lake_cat = ifelse(system == "natural", "Natural", "New"),
          lake_cat_fact = factor(ifelse(lake_cat == "Natural", "Natural", "New"), levels = c("New", "Natural")),
-         label_n_bas = paste0(label, " (", n_bas_spec, ")")) %>% 
-  ggplot(aes(x = reorder(label_n_bas, spec_mean), y = spec_mean, col = lake_cat_fact, size = n_lake_spec))+
+         label_n_bas = paste0(label, " (", n_bas_spec, ")"),
+         n_lakes_sys = ifelse(lake_cat == "New", nrow(new_lakes), nrow(natural_lakes)),
+         n_lake_spec_prop = n_lake_spec/n_lakes_sys*100) %>% 
+  #ggplot(aes(x = reorder(label_n_bas, spec_mean), y = spec_mean, col = lake_cat_fact, size = n_lake_spec))+
+  ggplot(aes(x = reorder(label_n_bas, spec_mean), y = spec_mean, col = lake_cat_fact, size = n_lake_spec_prop))+
   geom_point()+
   scale_colour_manual(values = c(viridisLite::viridis(1, begin = 0.5, end = 0.6), "coral"), name = "Lake age (years)")+
-  scale_size_area(name = "Occurrences", n.breaks = 4)+
+  scale_size(name = "Occurrences (%)", breaks = seq(0, 100, 25))+
   scale_y_continuous(breaks = seq(0, 1, 0.1), limits = c(0, 1))+
   coord_flip()+
   xlab("Species")+
