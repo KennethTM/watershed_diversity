@@ -24,6 +24,16 @@ basin_df <- model_and_fig_data[[1]] %>%
   
 summary(basin_df)
 
+#basin summary stats note
+# model_and_fig_data[[1]] %>% 
+#   st_drop_geometry() %>% 
+#   filter(!is.na(basin_sum_lake_area_m2)) %>% 
+#   mutate(basin_sum_stream_length_m = ifelse(is.na(basin_sum_stream_length_m), 0, basin_sum_stream_length_m))  %>% 
+#   tbl_df() %>% 
+#   select(elev_range_m, basin_prop_agri, basin_prop_arti, basin_sum_stream_length_m, basin_sum_lake_area_m2) %>% 
+#   summary()
+  
+
 #Examine correlations
 basin_preds <- basin_df %>% 
   select(-basin_id, -basin_ice_covered, -n_spec_basin,
@@ -183,6 +193,12 @@ lake_df <- model_and_fig_data[[2]] %>%
   st_drop_geometry()
 
 summary(lake_df)
+
+#Write model data incl names
+# lake_names <- readRDS(paste0(getwd(), "/data_raw/lake_names.rds"))
+# lake_df %>%
+#   left_join(lake_names) %>%
+#   write.csv2(paste0(getwd(), "/data_raw/all_model_data_names_19082020.csv"))
 
 #Examine distribution and correlations
 lake_preds <- lake_df %>% 
