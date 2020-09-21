@@ -41,7 +41,7 @@ basin_richness_map <- dk_basins %>%
   geom_sf(aes(fill = n_spec_basin), col = "black", size = 0.25)+
   geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "red", linetype = 1, show.legend = FALSE)+
   scale_fill_viridis_c(na.value="white", option = "D", name = "Basin richness", direction = -1, begin = 0.2)+
-  scale_x_continuous(breaks = xlabs, labels = paste0(xlabs,'°W')) +
+  scale_x_continuous(breaks = xlabs, labels = paste0(xlabs,'°E')) +
   scale_y_continuous(breaks = ylabs, labels = paste0(ylabs,'°N'))
 
 basin_fig <- basin_richness_map + basin_richness_freq + plot_layout(ncol = 1) + plot_annotation(tag_levels = "A")
@@ -74,7 +74,7 @@ lake_map_age <- lake_map_age_df %>%
   geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "red", linetype = 1, show.legend = FALSE)+
   scale_colour_manual(values = c(viridisLite::viridis(4, direction = -1), "coral"), name = "Lake age (years)")+
   guides(linetype = guide_legend(title = NULL, order = 2), colour = guide_legend(order = 1))+
-  scale_x_continuous(breaks = xlabs, labels = paste0(xlabs,'°W')) +
+  scale_x_continuous(breaks = xlabs, labels = paste0(xlabs,'°E')) +
   scale_y_continuous(breaks = ylabs, labels = paste0(ylabs,'°N'))
 
 lake_spec_prop <- lake_map_age_df %>% 
