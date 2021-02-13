@@ -458,3 +458,31 @@ ogr2ogr(paste0(getwd(), "/data_raw/lake_plants_raw_EK_Fixed.sqlite"),
         update = TRUE,
         overwrite = TRUE,
         a_srs = paste0("EPSG:", dk_epsg))
+
+
+
+
+
+#inext method to estimate number of species at each sampling
+library(iNEXT)
+inext_raw <- left_join(fish_net_lake, fish_weight_lake) %>%
+  mutate(date = ymd(Dato), 
+         year = year(date), 
+         name_novana = gsub(" ", "_", `Dansk navn`), 
+         site_id_year = paste0(ObservationsStedNr, "_", year)) %>% 
+  left_join(valid_fish_species) %>% #filter valid species
+  filter(action == 0) %>% 
+  group_by(site_id_year, name) %>% 
+  summarise(n=n()) %>% 
+  spread(site_id_year, n) %>% 
+  mutate_if(is.integer, list(~replace_na(., 0))) %>% 
+  as.data.frame()
+
+inext_data <- inext_raw[,-1]
+rownames(inext_data) <- inext_raw[,1]
+
+inext_res <- iNEXT(inext_data, q=0, datatype="abundance")
+
+inext_res$AsyEst %>% 
+  filter(Diversity == "Species richness") %>% 
+  write.csv("inext_test.csv")
