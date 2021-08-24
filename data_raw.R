@@ -1,18 +1,9 @@
 source("libs_and_funcs.R")
 
-#Download files to data_raw folder:
-#EU-DEM v1.1 (25 m resolution)
-#Denmark polygon
-#Danish lakes and streams polygon/line layers
-#Fish monitoring data ("Sø/Fisk/Vægt", "Sø/Fisk/Garn" and "Vandløb/Fisk/Længde" on www.odaforalle.dk)
-#Lake chemistry and secchi depths on www.odaforalle.dk
-#Lake submerged macrophyte data on www.odaforalle.dk
-#Line of ice progression during last ice age from GEUS
-
 #Write vector files for further processing to gis_database
 
 #Download Denmark polygon, cut Bornholm and reproject
-dk_border_raw <- raster::getData("GADM", country = "DNK", level = 0, path = paste0(getwd(), "/data_raw"))
+dk_border_raw <- getData("GADM", country = "DNK", level = 0, path = paste0(getwd(), "/data_raw"))
 
 dk_border <- dk_border_raw %>% 
   st_as_sf() %>% 	
@@ -29,40 +20,94 @@ ice_poly <- st_read(paste0(getwd(), "/data_raw/Isrande/Isrand_poly.shp")) %>%
 
 st_write(ice_poly, dsn = gis_database, layer = "dk_iceage", delete_layer = TRUE)
 
-#Reproject and cut EU-DEM using dk_poly
-#Cut and reproject
-gdalwarp(srcfile = paste0(getwd(), "/data_raw/eu_dem_v11_E40N30/eu_dem_v11_E40N30.TIF"), 
-         dstfile = paste0(getwd(), "/data_processed/dk_dem_25.tif"),
-         co = "COMPRESS=LZW", 
-         tr = c(25, 25), 
-         tap = TRUE,
-         r = "bilinear", 
-         dstnodata = -9999,
+#Create national 10 m dem (1.6 m dem originally) for basin delineation
+dhym <- paste0(getwd(), "/data_raw/dhym_rain.vrt")
+gdalwarp(srcfile = dhym,
+         dstfile = paste0(getwd(), "/data_raw/dhym_10m.tif"),
          cutline = gis_database,
          cl = "dk_border",
-         t_srs = paste0("EPSG:", dk_epsg),
          crop_to_cutline = TRUE,
-         overwrite = TRUE)
+         overwrite = TRUE,
+         dstnodata = -9999,
+         r = "min",
+         co = c("COMPRESS=LZW", "BIGTIFF=YES"),
+         tr = c(10, 10),
+         multi = TRUE,
+         wm = 4000)
 
-#Reproject, make 2d and clean lake and stream vector layers. Add to gis_database
-ogr2ogr(paste0(getwd(), "/data_raw/DK_StandingWater.gml"),
-        gis_database,
-        nln = "dk_lakes",
-        update = TRUE,
-        overwrite = TRUE,
-        t_srs = paste0("EPSG:", dk_epsg),
-        dim = 2,
-        select = "gml_id, elevation",
-        lco = "geometry_name=GEOMETRY")
+#Reproject, make 2d and clean stream vector layer, add to gis_database
+dk_streams_raw <- st_read(paste0(getwd(), "/data_raw/DK_WatercourseLink.gml"))
 
-ogr2ogr(paste0(getwd(), "/data_raw/DK_WatercourseLink.gml"),
-        gis_database,
-        nln = "dk_streams",
-        update = TRUE,
-        overwrite = TRUE,
-        t_srs = paste0("EPSG:", dk_epsg),
-        dim = 2,
-        select = "gml_id")
+dk_streams_clean <- dk_streams_raw %>% 
+  st_zm() %>% 
+  select(gml_id) %>% 
+  st_transform(dk_epsg) %>% 
+  mutate(stream_length_m = as.numeric(st_length(geometry)))
+
+st_write(dk_streams_clean, dsn = gis_database, layer = "dk_streams", delete_layer = TRUE)
+
+#Read, clean and edit lake vector layer, add to gis_database
+dk_lakes_raw <- st_read(paste0(getwd(), "/data_raw/DK_StandingWater.gml"))
+
+dk_lakes_clean <- dk_lakes_raw %>% 
+  st_zm() %>% 
+  select(gml_id, elevation) %>% 
+  st_transform(dk_epsg)
+
+#Add also a missing polygon to national lake polygon layer (OpenStreetMap)
+lillelund_engso <- st_read(paste0(getwd(), "/data_raw/lillelund_engso.kmz")) %>% 
+  mutate(gml_id = "lillelund_engso", 
+         elevation = 0) %>% 
+  select(gml_id, elevation) %>% 
+  st_zm() %>% 
+  st_transform(dk_epsg)
+
+#Read cutline layers
+fish_lake_cutlines <- st_read(paste0(getwd(), "/data_raw/fish_lake_cutlines.kmz")) %>% 
+  st_zm() %>% 
+  st_transform(dk_epsg) %>% 
+  st_union() %>% 
+  st_sfc()
+
+#Cut lake polygons
+dk_lakes_cut <- dk_lakes_clean %>% 
+  rbind(lillelund_engso) %>% 
+  st_split(fish_lake_cutlines) %>% 
+  st_collection_extract(type = "POLYGON") %>% 
+  mutate(gml_id = paste0(gml_id, "_", row_number(), "_edit"),
+         lake_area_m2 = as.numeric(st_area(geometry)),
+         shoreline_m = as.numeric(st_length(st_cast(geometry, "MULTILINESTRING")))) %>% 
+  rename(lake_elev_m = elevation)
+
+st_write(dk_lakes_cut, dsn = gis_database, layer = "dk_lakes", delete_layer = TRUE)
+
+#CLC 2012
+clc_legend <- read.csv(paste0(getwd(), "/data_raw/DK_CORINE_SHP_UTM32-WGS84/clc_legend.csv"), colClasses = "character")
+
+clc <- st_read(paste0(getwd(), "/data_raw/DK_CORINE_SHP_UTM32-WGS84/CLC12_DK.shp")) %>%
+  st_transform(dk_epsg) %>%
+  left_join(clc_legend, by = c("CODE_12"="CLC_CODE")) %>%
+  set_names(str_to_lower(names(.))) %>%
+  mutate(clc_code = parse_number(as.character(code_12)))
+
+st_write(clc, gis_database, layer = "corine_land_cover", delete_layer = TRUE)
+
+
+
+
+
+
+
+####
+
+
+
+
+
+
+
+
+
 
 #Read downloaded fish data, clean and save to gis_database
 #Format to columns: system, site_id, year, Xutm_Euref89_Zone32, Yutm_Euref89_Zone32, name_novana
@@ -258,34 +303,34 @@ fish_survey_with_shared_poly %>%
 dk_lakes %>% 
   filter(gml_id %in% fish_survey_with_shared_poly$gml_id) %>% 
   st_write(paste0(getwd(), "/data_raw/polygons_with_multiple_fish_surveys.kml"), delete_dsn = TRUE) 
+# 
+# #Add also a missing polygon to national lake polygon layer (OpenStreetMap)
+# lillelund_engso <- st_read(paste0(getwd(), "/data_raw/lillelund_engso.kmz")) %>% 
+#   mutate(gml_id = "lillelund_engso", 
+#          elevation = 0) %>% 
+#   select(gml_id, elevation) %>% 
+#   st_zm() %>% 
+#   st_transform(dk_epsg)
+# 
+# #Read cutline layers
+# fish_lake_cutlines <- st_read(paste0(getwd(), "/data_raw/fish_lake_cutlines.kmz")) %>% 
+#   st_zm() %>% 
+#   st_transform(dk_epsg) %>% 
+#   st_union() %>% 
+#   st_sfc()
 
-#Add also a missing polygon to national lake polygon layer (OpenStreetMap)
-lillelund_engso <- st_read(paste0(getwd(), "/data_raw/lillelund_engso.kmz")) %>% 
-  mutate(gml_id = "lillelund_engso", 
-         elevation = 0) %>% 
-  select(gml_id, elevation) %>% 
-  st_zm() %>% 
-  st_transform(dk_epsg)
-
-#Read cutline layers
-fish_lake_cutlines <- st_read(paste0(getwd(), "/data_raw/fish_lake_cutlines.kmz")) %>% 
-  st_zm() %>% 
-  st_transform(dk_epsg) %>% 
-  st_union() %>% 
-  st_sfc()
-
-#Cut lake polygons
-dk_lakes_cut <- dk_lakes %>% 
-  filter(gml_id %in% fish_survey_with_shared_poly$gml_id) %>% 
-  st_split(fish_lake_cutlines) %>% 
-  st_collection_extract(type = "POLYGON") %>% 
-  mutate(gml_id = paste0(gml_id, "_", row_number(), "_edit"))
-
-#Add to original data
-dk_lakes_edit <- dk_lakes %>% 
-  filter(!(gml_id %in% fish_survey_with_shared_poly$gml_id)) %>% 
-  rbind(dk_lakes_cut) %>% 
-  rbind(lillelund_engso)
+# #Cut lake polygons
+# dk_lakes_cut <- dk_lakes %>% 
+#   filter(gml_id %in% fish_survey_with_shared_poly$gml_id) %>% 
+#   st_split(fish_lake_cutlines) %>% 
+#   st_collection_extract(type = "POLYGON") %>% 
+#   mutate(gml_id = paste0(gml_id, "_", row_number(), "_edit"))
+# 
+# #Add to original data
+# dk_lakes_edit <- dk_lakes %>% 
+#   filter(!(gml_id %in% fish_survey_with_shared_poly$gml_id)) %>% 
+#   rbind(dk_lakes_cut) %>% 
+#   rbind(lillelund_engso)
 
 #Edit coordinates for lakes where sampling point coordinates are wrong
 #Coordinates of fish surveys visually inspected for mismatch between point and lake polygon
@@ -458,31 +503,3 @@ ogr2ogr(paste0(getwd(), "/data_raw/lake_plants_raw_EK_Fixed.sqlite"),
         update = TRUE,
         overwrite = TRUE,
         a_srs = paste0("EPSG:", dk_epsg))
-
-
-
-
-
-#inext method to estimate number of species at each sampling
-library(iNEXT)
-inext_raw <- left_join(fish_net_lake, fish_weight_lake) %>%
-  mutate(date = ymd(Dato), 
-         year = year(date), 
-         name_novana = gsub(" ", "_", `Dansk navn`), 
-         site_id_year = paste0(ObservationsStedNr, "_", year)) %>% 
-  left_join(valid_fish_species) %>% #filter valid species
-  filter(action == 0) %>% 
-  group_by(site_id_year, name) %>% 
-  summarise(n=n()) %>% 
-  spread(site_id_year, n) %>% 
-  mutate_if(is.integer, list(~replace_na(., 0))) %>% 
-  as.data.frame()
-
-inext_data <- inext_raw[,-1]
-rownames(inext_data) <- inext_raw[,1]
-
-inext_res <- iNEXT(inext_data, q=0, datatype="abundance")
-
-inext_res$AsyEst %>% 
-  filter(Diversity == "Species richness") %>% 
-  write.csv("inext_test.csv")

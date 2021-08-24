@@ -1,7 +1,7 @@
-library(sf);library(raster);library(rgdal);library(gdalUtils);library(tidyverse);library(readxl);
-library(lubridate);library(rgrass7);library(link2GI);library(patchwork);library(lwgeom);
-library(exactextractr);library(mapview);library(corrplot);library(mgcv);library(mgcViz);
-library(grainscape); library(igraph)
+library(sf);library(raster);library(rgdal);library(gdalUtils);
+library(tidyverse);library(readxl);library(lubridate);library(rgrass7);
+library(link2GI);library(patchwork);library(lwgeom);
+library(exactextractr);library(mapview);library(corrplot)
 
 #Danish projection, as EPSG number, used for spatial analysis (UTM ZONE 32)
 dk_epsg <- 25832
@@ -84,4 +84,3 @@ corvif <- function(dataz) {
   cat("\n\nVariance inflation factors\n\n")
   print(myvif(lm_mod))
 }
-
