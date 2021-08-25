@@ -1,7 +1,7 @@
 library(sf);library(raster);library(rgdal);library(gdalUtils);
 library(tidyverse);library(readxl);library(lubridate);library(rgrass7);
 library(link2GI);library(patchwork);library(lwgeom);
-library(exactextractr);library(mapview);library(corrplot)
+library(exactextractr);library(mapview);library(corrplot);library(fasterize)
 
 #Danish projection, as EPSG number, used for spatial analysis (UTM ZONE 32)
 dk_epsg <- 25832
@@ -84,3 +84,38 @@ corvif <- function(dataz) {
   cat("\n\nVariance inflation factors\n\n")
   print(myvif(lm_mod))
 }
+
+clean_names <- function(df){
+  col_names <- names(df)
+  col_names <- make.names(col_names)
+  col_names <- str_to_lower(col_names)
+  col_names <- sub('[[:punct:]]+$', '', col_names)
+  col_names <- gsub(".", "_", col_names, fixed = TRUE)
+  col_names <- gsub("___", "_", col_names, fixed = TRUE)
+  col_names <- gsub("__", "_", col_names, fixed = TRUE)
+  
+  names(df) <- col_names
+  return(df)
+}
+
+approx_bathy <- function(data){
+  if(nrow(data) == 1){
+    fun <- NULL
+  }else if(min(data$dybden_fra_i_meter, na.rm = TRUE) != 0){
+    fun <- NULL #one exception
+  }else{
+    depths <- c(max(data$dybden_til_i_meter), data$dybden_fra_i_meter)
+    areas <- c(0, data$area_accum)
+    fun <- approxfun(depths, areas) 
+  }
+  return(fun)
+}
+
+approx_bathy_integrate <- function(fun, from, to){
+  ifelse(is.null(fun), NA, integrate(fun, from, to, stop.on.error = FALSE)$value)
+}
+
+approx_bathy_layer_area <- function(fun, from, to){
+  ifelse(is.null(fun), NA, exec(fun, from) - exec(fun, to))
+}
+
