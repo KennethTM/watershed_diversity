@@ -69,6 +69,8 @@ chem_newlakes <- fish_newlakes_raw %>%
   select(site_id, secchi_depth_m:tn_mg_l) %>% 
   distinct()
 
+write_csv(chem_newlakes, paste0(getwd(), "/data_processed/chem_newlakes.csv"))
+
 #Fish species from both lakes and streams monitoring data and new lakes
 fish_species <- bind_rows(fish_lake_species, fish_stream_species, fish_newlakes)
 
@@ -104,7 +106,7 @@ fish_species_sub <- fish_species %>%
   filter(!(site_id %in% site_id_remove),
          name_danish %in% fish_species_valid$name_danish | is.na(name_danish)) %>% 
   filter(between(year_sample, 1990, 2020)) %>% 
-  left_join(fish_species_valid[,c("name_danish", "fish_id")])
+  left_join(fish_species_valid[, c("name_danish", "fish_id")])
 
 #Write species data to gis database
 #Used to determine basin species richness
@@ -113,30 +115,25 @@ fish_species_sub_sf <- fish_species_sub %>%
 
 st_write(fish_species_sub_sf, dsn = gis_database, layer = "fish_species_basin", delete_layer = TRUE)
 
+#Read atlas basin fish data
+atlas_raw <- read_csv(paste0(getwd(), "/data_raw/", "atlas_basin_data.csv")) %>% 
+  na.omit()
 
+atlas_clean <- atlas_raw %>% 
+  mutate(name_atlas = gsub(" ", "_", name_atlas)) %>% 
+  left_join(fish_species_unique_edit[, c("name_atlas", "fish_id", "action")]) %>%
+  filter(action == 0 & !is.na(fish_id)) %>% 
+  select(-action)
 
-
-# #Read atlas fish data, join with names and write to file
-# atlas_raw <- read_xlsx(paste0(getwd(), "/data_raw/atlasdata_oplande.xlsx")) %>% 
-#   mutate(name_atlas = gsub(" ", "_", species_latin)) %>% 
-#   left_join(select(fish_unique_edit, name_atlas, fish_id, action)) %>% 
-#   filter(action == 0)
-# 
-# atlas_raw %>% 
-#   select(basin_id, fish_id) %>% 
-#   distinct() %>% 
-#   saveRDS(paste0(getwd(), "/data_raw/atlasdata_ids.rds"))
-
-
-
+write_csv(atlas_clean, paste0(getwd(), "/data_processed/atlas_clean.csv"))
 
 #Lakes for investigation is sample with highest richness after 2006
 fish_species_richest_survey <- fish_species_sub %>% 
-  filter(year >= 2006,
-         system %in% c("lake", "newlake")) %>% 
-  group_by(system, site_id, year) %>% 
+  filter(year_sample >= 2006,
+         system == "lake") %>% 
+  group_by(system, site_id, year_sample) %>% 
   summarise(n_spec = ifelse(all(is.na(fish_id)), 0, length(unique(fish_id)))) %>% 
-  summarise(year_max_rich = year[which.max(n_spec)])  %>% 
+  summarise(year_max_rich = year_sample[which.max(n_spec)])  %>% 
   ungroup()
 
 #site_id's to be exclude
@@ -147,9 +144,8 @@ fish_lake_doubles <- c(c(14000045, 20000218),
 
 #Lakes for investigation
 fish_species_lakes_raw <- fish_species_richest_survey %>% 
-  rename(year = year_max_rich) %>% 
+  rename(year_sample = year_max_rich) %>% 
   left_join(fish_species_sub) %>% 
-  distinct() %>% 
   filter(!(site_id %in% fish_lake_doubles))
 
 #Write lake raw species data to gis database
@@ -161,7 +157,7 @@ st_write(fish_species_lakes_raw_sf, dsn = gis_database, layer = "fish_species_la
 #Write files with with problems which should be reviewed and fixed manually
 #Multiple fish surveys in same lake polygon
 #Missing lake polygons
-#Problems and actions are listed in "Fishdata with no polygon and with multiple poly.xlsx"
+#Notes are in "files_to_fix_notes.xlsx"
 #Use raw fish data to identify fish site/lake polygon problems
 dk_lakes <- st_read(dsn = gis_database, layer = "dk_lakes")
 
@@ -171,7 +167,7 @@ fish_species_lakes_raw_sf %>%
   distinct(.keep_all = TRUE) %>% 
   st_join(dk_lakes) %>% 
   filter(is.na(gml_id)) %>%  
-  st_write(paste0(getwd(), "/data_raw/fish_data_with_no_polygon.sqlite"), delete_dsn = TRUE)
+  st_write(paste0(getwd(), "/data_raw/files_to_fix/fish_data_with_no_polygon.sqlite"), delete_dsn = TRUE)
 
 #Some polygons are shared between site_id's
 fish_survey_with_shared_poly <- fish_species_lakes_raw_sf %>% 
@@ -183,45 +179,17 @@ fish_survey_with_shared_poly <- fish_species_lakes_raw_sf %>%
   filter(n > 1)
 
 fish_survey_with_shared_poly %>% 
-  st_write(paste0(getwd(), "/data_raw/fish_data_with_more_than_one_polygon.sqlite"), delete_dsn = TRUE) 
+  st_write(paste0(getwd(), "/data_raw/files_to_fix/fish_data_with_more_than_one_polygon.sqlite"), delete_dsn = TRUE) 
 
 #Use gml_id for polygons which contain multiple fish surveys
 #Save and create cutline layer in google earth
 dk_lakes %>% 
   filter(gml_id %in% fish_survey_with_shared_poly$gml_id) %>% 
-  st_write(paste0(getwd(), "/data_raw/polygons_with_multiple_fish_surveys.kml"), delete_dsn = TRUE) 
-# 
-# #Add also a missing polygon to national lake polygon layer (OpenStreetMap)
-# lillelund_engso <- st_read(paste0(getwd(), "/data_raw/lillelund_engso.kmz")) %>% 
-#   mutate(gml_id = "lillelund_engso", 
-#          elevation = 0) %>% 
-#   select(gml_id, elevation) %>% 
-#   st_zm() %>% 
-#   st_transform(dk_epsg)
-# 
-# #Read cutline layers
-# fish_lake_cutlines <- st_read(paste0(getwd(), "/data_raw/fish_lake_cutlines.kmz")) %>% 
-#   st_zm() %>% 
-#   st_transform(dk_epsg) %>% 
-#   st_union() %>% 
-#   st_sfc()
-
-# #Cut lake polygons
-# dk_lakes_cut <- dk_lakes %>% 
-#   filter(gml_id %in% fish_survey_with_shared_poly$gml_id) %>% 
-#   st_split(fish_lake_cutlines) %>% 
-#   st_collection_extract(type = "POLYGON") %>% 
-#   mutate(gml_id = paste0(gml_id, "_", row_number(), "_edit"))
-# 
-# #Add to original data
-# dk_lakes_edit <- dk_lakes %>% 
-#   filter(!(gml_id %in% fish_survey_with_shared_poly$gml_id)) %>% 
-#   rbind(dk_lakes_cut) %>% 
-#   rbind(lillelund_engso)
+  st_write(paste0(getwd(), "/data_raw/files_to_fix/polygons_with_multiple_fish_surveys.kml"), delete_dsn = TRUE) 
 
 #Edit coordinates for lakes where sampling point coordinates are wrong
 #Coordinates of fish surveys visually inspected for mismatch between point and lake polygon
-lake_id_new_coord <- read_xlsx(paste0(getwd(), "/data_raw/Fishdata with no polygon and with multiple poly.xlsx"), sheet = 1) %>% 
+lake_id_new_coord <- read_xlsx(paste0(getwd(), "/data_raw/files_to_fix_notes.xlsx"), sheet = 1) %>% 
   na.omit() %>% 
   select(-ogc_fid, -note) %>% 
   rename(x = new_x, y = new_y) %>% 
@@ -241,27 +209,21 @@ lake_id_new_coord_zone33_to_32 <- lake_id_new_coord %>%
 #Edit coordinates in fish_species_lake_raw layers
 fish_species_lakes_edit <- bind_rows(lake_id_new_coord_zone32, lake_id_new_coord_zone33_to_32) %>% 
   select(-zone) %>% 
+  mutate(site_id = as.character(site_id)) %>% 
   right_join(fish_species_lakes_raw) %>% 
   mutate(Xutm_Euref89_Zone32_cor = coalesce(x, Xutm_Euref89_Zone32),
          Yutm_Euref89_Zone32_cor = coalesce(y, Yutm_Euref89_Zone32)) %>% 
-  select(-x, -y, -Xutm_Euref89_Zone32, -Yutm_Euref89_Zone32) %>% 
-  filter(!(site_id %in% fish_lake_doubles))
+  select(-x, -y, -Xutm_Euref89_Zone32, -Yutm_Euref89_Zone32)
 
 #Write lake species data to gis database with polygon id (gml_id)
 fish_species_lakes_edit_sf <- fish_species_lakes_edit %>% 
   st_as_sf(coords = c("Xutm_Euref89_Zone32_cor", "Yutm_Euref89_Zone32_cor"), crs = dk_epsg) %>% 
-  st_join(dk_lakes_edit)
+  st_join(dk_lakes)
 
 st_write(fish_species_lakes_edit_sf, dsn = gis_database, layer = "fish_species_lakes", delete_layer = TRUE)
 
 #Write subset of dk_lakes polygons only including lakes with fish data
-dk_lakes_subset <- dk_lakes_edit %>% 
+dk_lakes_subset <- dk_lakes %>% 
   filter(gml_id %in% fish_species_lakes_edit_sf$gml_id) 
 
 st_write(dk_lakes_subset, dsn = gis_database, layer = "dk_lakes_subset", delete_layer = TRUE)
-
-#Write editted dk_lakes_layer to file 
-dk_lakes_edit_with_area <- dk_lakes_edit %>% 
-  mutate(area=as.numeric(st_area(geometry)))
-
-st_write(dk_lakes_edit_with_area, dsn = gis_database, layer = "dk_lakes_edit", delete_layer = TRUE)
