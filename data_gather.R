@@ -1,24 +1,9 @@
 source("libs_and_funcs.R")
 
-#Basin data
-basins <- st_read(gis_database, layer = "basins")
-fish_species_basin <- st_read(dsn = gis_database, layer = "fish_species_basin") 
-atlas_clean <- read_csv(paste0(getwd(), "/data_processed/atlas_clean.csv"))
-
-#Basin species count
-basin_species_count <- fish_species_basin %>% 
-  st_join(basins) %>% 
-  st_drop_geometry() %>% 
-  select(basin_id, fish_id) %>% 
-  na.omit() %>% 
-  bind_rows(atlas_clean) %>% 
-  group_by(basin_id) %>% 
-  summarise(n_spec_basin = ifelse(all(is.na(fish_id)), 0, length(unique(fish_id))))
-
-write_csv(basin_species_count, paste0(getwd(), "/data_processed/basin_species_count.csv"))
-
 #Lake species count 
 fish_species_lakes <- st_read(gis_database, layer = "fish_species_lakes")
+
+lake_fish_ids <- fish_species_lakes$fish_id %>% unique() %>% na.omit()
 
 lake_species_count <- fish_species_lakes %>% 
   st_drop_geometry() %>% 
@@ -31,17 +16,48 @@ lake_species_count <- fish_species_lakes %>%
             shoreline_m = first(shoreline_m)) %>% 
   ungroup()
 
-#Join plant data
-lake_plant_df <- st_read(gis_database, layer = "lake_plants") %>% 
-  rename(year_sample = year) %>% 
+#Basin data
+basins <- st_read(gis_database, layer = "basins")
+fish_species_basin <- st_read(dsn = gis_database, layer = "fish_species_basin") 
+atlas_clean <- read_csv(paste0(getwd(), "/data_processed/atlas_clean.csv"))
+
+#Basin species count
+basin_species_count <- fish_species_basin %>% 
+  st_join(basins) %>% 
+  st_drop_geometry() %>% 
+  as_tibble() %>% 
+  select(basin_id, fish_id) %>% 
+  na.omit() %>% 
+  bind_rows(atlas_clean) %>% 
+  filter(fish_id %in% lake_fish_ids) %>% 
+  group_by(basin_id) %>% 
+  summarise(n_spec_basin = ifelse(all(is.na(fish_id)), 0, length(unique(fish_id))))
+
+write_csv(basin_species_count, paste0(getwd(), "/data_processed/basin_species_count.csv"))
+
+#Join bathy data
+lake_bathy_df <- st_read(gis_database, layer = "lake_bathy") %>% 
   st_drop_geometry() %>% 
   mutate(site_id = as.character(site_id))
 
-lake_species_count_plant <- lake_species_count %>% 
-  left_join(lake_plant_df)
+newlake_bathy <- read_csv("data_raw/bathy_newlakes.csv") %>% 
+  select(site_name, bathy_area = lake_area_m2, bathy_vol = lake_vol_m3, bathy_zmean = mean_depth_m, bathy_zmax = max_depth_m)
+
+lake_species_count_bathy <- lake_species_count %>% 
+  left_join(lake_bathy_df) %>% 
+  left_join(newlake_bathy, by = c("site_name" = "site_name")) %>% 
+  mutate(bathy_area = coalesce(bathy_area.x, bathy_area.y),
+         bathy_vol = coalesce(bathy_vol.x, bathy_vol.y),
+         bathy_zmean = coalesce(bathy_zmean.x, bathy_zmean.y),
+         bathy_zmax = coalesce(bathy_zmax.x, bathy_zmax.y)) %>% 
+  select(-contains(".x"), -contains(".y"))
 
 #Join chemistry data
-dk_lakes_subset <- st_read(gis_database, layer = "dk_lakes_subset")
+dk_streams <- st_read(dsn = gis_database, layer = "dk_streams")
+
+dk_lakes_subset <- st_read(gis_database, layer = "dk_lakes_subset") %>% 
+  mutate(lake_stream_connect = lengths(st_intersects(GEOMETRY, dk_streams)))
+
 chem_newlakes <- read_csv(paste0(getwd(), "/data_processed/chem_newlakes.csv")) %>% 
   rename(alk_mmol_l=alk_meq_l, ph_ph=pH_pH)
 
@@ -94,12 +110,13 @@ basin_attr_all <- basin_attr %>%
   left_join(lake_basin_id)
 
 #Collect all data
-lake_species_all <- lake_species_count_plant %>% 
+lake_species_all <- lake_species_count_bathy %>% 
   left_join(lake_species_count_chem) %>% 
   left_join(dk_lakes_subset_age) %>% 
+  left_join(st_drop_geometry(dk_lakes_subset[,c("gml_id", "lake_stream_connect")])) %>% 
   mutate(year_established = coalesce(year_established, year_established_2)) %>% 
   select(-year_established_2) %>% 
   left_join(basin_attr_all)
 
-#write temporary csv
+#Write csv
 write_csv(lake_species_all, paste0(getwd(), "/data_processed/lake_species_all.csv"))

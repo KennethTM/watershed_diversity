@@ -3,13 +3,11 @@ source("libs_and_funcs.R")
 #Prepare environmental data for further analysis:
 #Chemistry
 #Secchi depth
-#Plant and bathymetry
+#Bathymetry
 
 #Submerged macrophyte and depth rawdata from www.odaforalle.au.dk
 #Time period 01-01-1990 to 01-10-2020
 depth_area <- read_xlsx(paste0(getwd(), "/data_raw/odaforalle_depth_area_01102020.xlsx")) %>% 
-  clean_names()
-plant_water <- read_xlsx(paste0(getwd(), "/data_raw/odaforalle_plant_water_01102020.xlsx")) %>% 
   clean_names()
 
 #lake plant cover
@@ -24,12 +22,12 @@ cover_to_pct <- tribble(~total_dækningsgrad, ~plant_cover,
                         "95-100%", 98)
 
 #lake coordinates
-#correct wrong coordinates for skenkelsø
-lake_coords <- plant_water %>% 
-  select(observationsstednr, observationsstednavn, xutm_euref89_zone32, yutm_euref89_zone32) %>% 
-  distinct() %>% 
+# #correct wrong coordinates for skenkelsø
+lake_coords <- depth_area %>%
+  select(observationsstednr, observationsstednavn, xutm_euref89_zone32, yutm_euref89_zone32) %>%
+  distinct() %>%
   mutate(xutm_euref89_zone32 = ifelse(observationsstednr == "52000929", 696273, xutm_euref89_zone32),
-         yutm_euref89_zone32 = ifelse(observationsstednr == "52000929", 6188507, yutm_euref89_zone32)) 
+         yutm_euref89_zone32 = ifelse(observationsstednr == "52000929", 6188507, yutm_euref89_zone32))
 
 #lake bathymetry data
 lake_depth_area <- depth_area %>% 
@@ -51,50 +49,19 @@ lake_bathy <- lake_depth_area %>%
          bathy_vol_approx = map2_dbl(bathy_fun, bathy_zmax, ~approx_bathy_integrate(.x, 0, .y)),
          bathy_vol = ifelse(bathy_n == 1, pi*(bathy_area/pi)*bathy_zmax/3, bathy_vol_approx), #when only zmax and area is available, assume cone volume
          bathy_zmean = bathy_vol/bathy_area) %>% 
-  ungroup()
+  ungroup() %>% 
+  select(-bathy_vol_approx)
 
-lake_depth_area_layer <- lake_depth_area %>% 
-  left_join(lake_bathy %>% 
-              select(observationsstednr, observationsstednavn, startdato, bathy_fun, bathy_n, bathy_area, bathy_zmean)) %>% 
-  mutate(layer_area = pmap_dbl(list(bathy_fun, dybden_fra_i_meter, dybden_til_i_meter), approx_bathy_layer_area),
-         layer_area = ifelse(bathy_n == 1 & is.na(layer_area), bathy_area, layer_area)) %>% #if bathy only contains one depth use total area
-  select(-arealet_i_m2, -bathy_fun, -bathy_n, -bathy_area, -bathy_zmean)
-
-#Lake relative plant cover
-lake_plant_water <- plant_water %>% 
-  left_join(cover_to_pct) %>% 
-  select(observationsstednr, observationsstednavn, startdato, transektnummer, punktnummer, 
-         vanddybden_i_m, gsnit_plantehøjde_m, plant_cover) %>% 
-  distinct() %>% 
-  mutate_at(vars(vanddybden_i_m, gsnit_plantehøjde_m), 
-            list(~parse_number(., locale = locale(decimal_mark = ",")))) %>% 
-  mutate(vanddybden_i_m = ifelse(vanddybden_i_m == 0, 0.01, vanddybden_i_m))
-
-lake_level_stats <- lake_plant_water %>% 
-  left_join(lake_depth_area) %>% 
-  mutate(is_within_depth = ifelse(vanddybden_i_m >= dybden_fra_i_meter & vanddybden_i_m < dybden_til_i_meter, "within", "outside")) %>% 
-  filter(is_within_depth == "within") %>% 
-  group_by(observationsstednr, observationsstednavn, startdato, dybden_fra_i_meter, dybden_til_i_meter, transektnummer) %>% 
-  summarise(rpa_trans = mean(plant_cover)) %>% 
-  summarise(rpa_depth_int = mean(rpa_trans)) %>%
-  left_join(lake_depth_area_layer) %>% 
-  mutate(rpa_area = (rpa_depth_int/100) * layer_area) %>%
-  group_by(observationsstednr, observationsstednavn, startdato) %>% 
-  summarise(lake_rpa = sum(rpa_area)) %>% 
-  left_join(lake_bathy %>% select(observationsstednr, observationsstednavn, startdato, bathy_zmax, bathy_zmean, bathy_area, bathy_vol)) %>% 
-  mutate(lake_rpa_perc = lake_rpa/bathy_area*100) %>% 
-  ungroup()
-
-lake_level_stats_sf <- lake_level_stats %>% 
+lake_level_stats_sf <- lake_bathy %>% 
+  group_by(observationsstednr, observationsstednavn) %>% 
+  summarise_at(vars("bathy_area", "bathy_vol", "bathy_zmean", "bathy_zmax"), list(~.x[which.max(bathy_n)])) %>% 
+  ungroup() %>% 
   left_join(lake_coords) %>% 
-  mutate(year = year(ymd(startdato))) %>% 
-  select(site_id = observationsstednr, site_name = observationsstednavn,
-         year, lake_rpa, lake_rpa_perc, contains("bathy_"),
-         xutm_euref89_zone32, yutm_euref89_zone32) %>% 
   filter(!is.na(xutm_euref89_zone32)) %>% 
+  rename(site_name = observationsstednavn, site_id = observationsstednr) %>% 
   st_as_sf(coords = c("xutm_euref89_zone32", "yutm_euref89_zone32"), crs = dk_epsg)
 
-st_write(lake_level_stats_sf, dsn = gis_database, layer = "lake_plants", delete_layer = TRUE)
+st_write(lake_level_stats_sf, dsn = gis_database, layer = "lake_bathy", delete_layer = TRUE)
 
 #chemistry and secchi data
 lake_secchi_raw <- read_xlsx(paste0(getwd(), "/data_raw/odaforalle_secchi_lake_09112020.xlsx")) %>% 
