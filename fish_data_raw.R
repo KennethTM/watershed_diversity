@@ -80,10 +80,6 @@ fish_species_unique <- fish_species %>%
   arrange(name_danish) %>%
   na.omit()
 
-#Write to file and add new columns with id's and actions
-#Editted list saved as "fish_species_unique.xlsx"
-#write_csv(fish_species_unique, paste0(getwd(), "/data_raw/fish_species_unique.csv"))
-
 #Fish species for further analysis and create fish species id
 #Actions: 0=do_nothing, 1=remove_species, 2=remove_lake (brackish or marine)
 fish_species_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/fish_species_unique.xlsx")) %>% 
@@ -104,8 +100,8 @@ fish_species_valid <- fish_species_unique_edit %>%
 #Join with fish_id's
 fish_species_sub <- fish_species %>% 
   filter(!(site_id %in% site_id_remove),
-         name_danish %in% fish_species_valid$name_danish | is.na(name_danish)) %>% 
-  filter(between(year_sample, 1990, 2020)) %>% 
+         between(year_sample, 1990, 2020)) %>% 
+  filter(name_danish %in% fish_species_valid$name_danish | is.na(name_danish)) %>% 
   left_join(fish_species_valid[, c("name_danish", "fish_id")])
 
 #Write species data to gis database
