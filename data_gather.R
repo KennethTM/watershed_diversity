@@ -1,5 +1,9 @@
 source("libs_and_funcs.R")
 
+
+#IS BORNHOLM CUT OUT??
+
+
 #Lake species count 
 fish_species_lakes <- st_read(gis_database, layer = "fish_species_lakes")
 

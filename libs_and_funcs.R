@@ -1,7 +1,7 @@
-library(sf);library(raster);library(rgdal);library(gdalUtils);
+library(fasterize);library(sf);library(raster);library(rgdal);library(gdalUtils);
 library(tidyverse);library(readxl);library(lubridate);library(rgrass7);
 library(link2GI);library(patchwork);library(lwgeom);
-library(exactextractr);library(mapview);library(corrplot);library(fasterize)
+library(exactextractr);library(mapview);library(corrplot)
 
 #Danish projection, as EPSG number, used for spatial analysis (UTM ZONE 32)
 dk_epsg <- 25832
