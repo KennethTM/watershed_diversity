@@ -4,7 +4,9 @@ source("libs_and_funcs.R")
 dk_border <- st_read(dsn = gis_database, layer = "dk_border") 
 dk_iceage <- st_read(dsn = gis_database, layer = "dk_iceage") 
 
-dk_iceage_cut <- st_intersection(dk_iceage %>% st_cast("LINESTRING"), dk_border) %>% 
+dk_iceage_cut <- dk_iceage %>% 
+  st_cast("LINESTRING") %>% 
+  st_intersection(dk_border) %>% 
   st_collection_extract("LINESTRING")
 
 model_data_raw <- read_csv(paste0(getwd(), "/data_processed/lake_species_all.csv")) 
@@ -23,10 +25,12 @@ basins_count <- basins %>%
 
 table(basins_count$n_spec_basin)
 
-basin_freq <- basin_species_count %>% 
+basin_freq <- basins_count %>% 
   ggplot(aes(n_spec_basin))+
-  geom_histogram(fill = NA, col = "black", binwidth = 1)+
+  geom_histogram(col = "white", fill = "grey", binwidth = 1)+
   scale_y_continuous(expand = expansion(mult = c(0, 0.1)))+
+  coord_cartesian(ylim=c(0, 160))+
+  annotate("text", x = 0, y = 160, label = "831", size=3)+
   ylab("Frequency")+
   xlab("Basin richness")
 
@@ -36,8 +40,8 @@ ylabs <- seq(54.5, 57.5, 0.5)
 basin_richness <- basins_count %>% 
   ggplot()+
   geom_sf(data = dk_border, fill = NA, col = "black")+
-  geom_sf(aes(fill = n_spec_basin), col = "black", size = 0.25)+
-  geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "white", linetype = 1, show.legend = FALSE)+
+  geom_sf(aes(fill = n_spec_basin), col = "black", size = 0.20)+
+  geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "coral", linetype = 1, show.legend = FALSE)+
   scale_fill_viridis_c(na.value="white", option = "D", name = "Species richness", direction = -1, begin = 0.2)+
   scale_x_continuous(breaks = xlabs, labels = paste0(xlabs,'°E')) +
   scale_y_continuous(breaks = ylabs, labels = paste0(ylabs,'°N'))+
@@ -68,10 +72,10 @@ figure_2_data <- model_data_raw %>%
 
 lake_map <- figure_2_data %>% 
   ggplot() +
-  geom_sf(data = dk_border, col = "black", fill = "grey")+
+  geom_sf(data = dk_border, col = "grey", fill = NA)+
   geom_sf(aes(col = lake_age_bins), size = 0.7)+
-  geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "white", linetype = 1, show.legend = FALSE)+
-  scale_colour_manual(values = c(viridisLite::viridis(4, direction = -1), "coral"), name = "Lake age (years)")+
+  geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "coral", linetype = 1, show.legend = FALSE)+
+  scale_colour_manual(values = c(viridisLite::viridis(4, direction = -1, begin = 0.3), "black"), name = "Lake age (years)")+
   guides(linetype = guide_legend(title = NULL, order = 2), colour = guide_legend(order = 1))+
   scale_x_continuous(breaks = xlabs, labels = paste0(xlabs,'°E')) +
   scale_y_continuous(breaks = ylabs, labels = paste0(ylabs,'°N'))
@@ -79,9 +83,9 @@ lake_map <- figure_2_data %>%
 lake_freq <- figure_2_data %>% 
   st_drop_geometry() %>% 
   ggplot(aes(x=n_spec_lake))+
-  geom_histogram(fill = NA, col = "black", binwidth = 1)+
-  geom_density(aes(y=..count.., col = lake_cat))+
-  scale_color_manual(values = c(viridisLite::viridis(1, begin = 0.5, end = 0.6), "coral"), name = "Lake group")+
+  geom_histogram(fill = "grey", col = "white", binwidth = 1)+
+  geom_density(aes(y=..count.., col = lake_cat), position = position_stack())+
+  scale_color_manual(values = c(viridisLite::viridis(4, direction = -1, begin = 0.3)[2], "black"), name = "Lake group")+
   ylab("Frequency")+
   xlab("Species richness")+
   scale_y_continuous(expand = expansion(mult = c(0, 0.1)))
