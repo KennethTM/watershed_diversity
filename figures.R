@@ -29,8 +29,9 @@ basin_freq <- basins_count %>%
   ggplot(aes(n_spec_basin))+
   geom_histogram(col = "white", fill = "grey", binwidth = 1)+
   scale_y_continuous(expand = expansion(mult = c(0, 0.1)))+
-  coord_cartesian(ylim=c(0, 160))+
-  annotate("text", x = 0, y = 160, label = "831", size=3)+
+  coord_cartesian(ylim=c(0, 155))+
+  annotate("segment", x = 0, xend = 2, y = 155, yend = 160, colour = "black")+
+  annotate("text", x = 4, y = 160, label = "831", size=3)+
   ylab("Frequency")+
   xlab("Basin richness")
 
@@ -62,9 +63,10 @@ lake_coords <- fish_species_lakes %>%
 
 figure_2_data <- model_data_raw %>% 
   mutate(lake_age = ifelse(is.na(year_established), 9999, year_sample - year_established),
-         lake_age_bins = cut(lake_age, breaks = c(-1, 10, 20, 50, 100, 10000), 
-                             labels = c("0-10", "10-20", "20-50", "50-100", "Natural")),
-         lake_cat = factor(ifelse(lake_age_bins == "Natural", "Natural", "New"), levels = c("New", "Natural"))) %>% 
+         lake_age_bins = cut(lake_age, 
+                             breaks = c(-1, 10, 20, 200, 10000), 
+                             labels = c("0-10", "10-20", ">20", "Unknown")),
+         lake_cat = factor(ifelse(lake_age_bins == "Unknown", "Natural", "New"), levels = c("New", "Natural"))) %>% 
   select(gml_id, n_spec_lake, lake_cat, lake_age_bins, lake_age) %>% 
   left_join(lake_coords) %>% 
   st_as_sf() %>% 
@@ -73,9 +75,10 @@ figure_2_data <- model_data_raw %>%
 lake_map <- figure_2_data %>% 
   ggplot() +
   geom_sf(data = dk_border, col = "grey", fill = NA)+
-  geom_sf(aes(col = lake_age_bins), size = 0.7)+
+  geom_sf(aes(col = lake_age_bins, shape = lake_cat), size = 0.7)+
   geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "coral", linetype = 1, show.legend = FALSE)+
-  scale_colour_manual(values = c(viridisLite::viridis(4, direction = -1, begin = 0.3), "black"), name = "Lake age (years)")+
+  scale_colour_manual(values = c(viridisLite::viridis(3, direction = -1, begin = 0.3), "black"), name = "Lake age (years)")+
+  scale_shape_manual(values = c("Natural" = 1, "New" = 19), name = "Lake group")+
   guides(linetype = guide_legend(title = NULL, order = 2), colour = guide_legend(order = 1))+
   scale_x_continuous(breaks = xlabs, labels = paste0(xlabs,'°E')) +
   scale_y_continuous(breaks = ylabs, labels = paste0(ylabs,'°N'))
@@ -97,6 +100,42 @@ figure_2
 ggsave(paste0(getwd(), "/figures/figure_2.png"), figure_2, units = "mm", width = 129, height = 160)
 
 
+
+
+
+
+fish_species_wide <- fish_species_lakes %>% 
+  st_drop_geometry() %>% 
+  left_join(model_data_raw[,c("gml_id", "year_established")]) %>% 
+  mutate(lake_age = ifelse(is.na(year_established), 9999, year_sample - year_established),
+         lake_age_bins = cut(lake_age, 
+                             breaks = c(-1, 10, 20, 200, 10000), 
+                             labels = c("0-10", "10-20", ">20", "Unknown")),
+         lake_group = factor(ifelse(lake_age_bins == "Unknown", "Natural", "New"), levels = c("New", "Natural"))) %>% 
+  select(gml_id, lake_group, lake_age_bins, fish_id) %>% 
+  na.omit() %>% #remove no catch lakes
+  mutate(presence = 1) %>% 
+  spread(fish_id, presence)
+  
+
+
+
+
+
+spec_matrix <- fish_species_wide %>% 
+  select(-gml_id, -lake_group, -lake_age_bins) %>% 
+  as.matrix()
+spec_matrix[is.na(spec_matrix)] <- 0
+rownames(spec_matrix) <- 
+
+library(vegan)
+spec_bray <- vegdist(spec_matrix, method="bray", binary = TRUE)
+spec_pcoa <- cmdscale(spec_bray, k=(nrow(spec_matrix)-1), eig=TRUE)
+
+data.frame(dim1 = spec_pcoa$points[,1], dim2 = spec_pcoa$points[,2], dim3 = spec_pcoa$points[,3],
+      age = fish_species_wide$lake_age_bins) %>% 
+  ggplot(aes(dim1, dim2, col=age))+
+  geom_point()
 
 
 

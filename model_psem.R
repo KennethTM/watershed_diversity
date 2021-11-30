@@ -47,22 +47,27 @@ model_data <- model_data_raw %>%
          !is.na(basin_agri),
          !is.na(tp_mg_l),
          !is.na(ph_ph)) %>% 
-  mutate_at(vars(basin_lake_area_m2, bathy_area, bathy_zmax, chla_ug_l, secchi_depth_m, tp_mg_l, basin_slope_prc), list(log10))
+  mutate_at(vars(basin_lake_area_m2, bathy_area, bathy_zmax, chla_ug_l, secchi_depth_m, tp_mg_l, basin_slope_prc), list(log10)) %>% 
+  mutate(lake_age = ifelse(is.na(year_established), 9999, year_sample - year_established),
+         lake_age_bins = cut(lake_age, 
+                             breaks = c(-1, 10, 20, 200, 10000), 
+                             labels = c("0-10", "10-20", ">20", "Unknown")),
+         lake_age_bins = factor(lake_age_bins, levels = c("Unknown", "0-10", "10-20", ">20"))) %>% 
+  select(-lake_age, -year_established)
 
 summary(model_data)
 
-#split data
-model_data_newlakes <- model_data %>% 
-  filter(!is.na(year_established))
-
-model_data_natural <- model_data %>% 
-  filter(is.na(year_established))
+# #split data
+# model_data_newlakes <- model_data %>% 
+#   filter(!is.na(year_established))
+# 
+# model_data_natural <- model_data %>% 
+#   filter(is.na(year_established))
 
 #specify model
 psem_mod <- psem(
-  glmer(n_spec_basin ~ ice_covered+basin_lake_area_m2+basin_agri+basin_slope_prc+(1|basin_id), data = model_data_natural, family = "poisson", nAGQ=0),
-  glmer(n_spec_lake ~ ice_covered+n_spec_basin+lake_elev_m+bathy_area+bathy_zmax+alk_mmol_l+chla_ug_l+ph_ph+tp_mg_l+secchi_depth_m+lake_stream_connect+(1|basin_id), data = model_data_natural, family = "poisson", nAGQ=0)
+  glmer(n_spec_basin ~ ice_covered+basin_lake_area_m2+basin_agri+basin_slope_prc+(1|basin_id), data = model_data, family = "poisson", nAGQ=0),
+  glmer(n_spec_lake ~ ice_covered+n_spec_basin+lake_elev_m+bathy_area+bathy_zmax+alk_mmol_l+chla_ug_l+ph_ph+tp_mg_l+secchi_depth_m+lake_stream_connect+lake_age_bins+(1|basin_id), data = model_data, family = "poisson", nAGQ=0)
 )
-summary(psem_mod)
-
-
+psem_sum <- summary(psem_mod)
+psem_sum
