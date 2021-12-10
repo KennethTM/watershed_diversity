@@ -67,3 +67,24 @@ basin_attr <- bind_cols(basin_id = basins$basin_id,
 
 #Save data.frame
 saveRDS(basin_attr, paste0(getwd(), "/data_processed/basin_attr.rds"))
+
+
+#####
+
+
+#salinity at basin outlet
+sal_stack <- raster(paste0(getwd(), "/data_raw/global-reanalysis-phy-001-030-monthly_1638544155158.nc"), varname="so")
+sal_mean <- calc(sal_stack, mean)
+
+sal_pkt <- rasterToPoints(sal_mean) %>% 
+  as.data.frame() %>% 
+  rename(salinity=layer) %>% 
+  st_as_sf(coords=c("x", "y"), crs = st_crs(sal_mean)) %>% 
+  st_transform(dk_epsg)
+
+basins_sal <- basins %>% 
+  st_join(sal_pkt, join=st_nearest_feature) %>% 
+  st_drop_geometry() %>% 
+  select(basin_id, salinity)
+
+saveRDS(basins_sal, paste0(getwd(), "/data_processed/basins_sal.rds"))
