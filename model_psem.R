@@ -61,7 +61,10 @@ model_data <- model_data_trans %>%
          !is.na(secchi_depth_m),
          !is.na(basin_arti)) %>% 
   select(-basin_area_m2, -basin_circum_m, -basin_elev_range, -basin_stream_length_m,
-         -bathy_zmean, -bathy_vol)
+         -bathy_zmean, -bathy_vol) %>% 
+  mutate(lake_stream_connect = ifelse(lake_stream_connect == "0", 0, 1),
+         ice_covered = as.numeric(ice_covered)-1,
+         lake_age_bins = ifelse(lake_age_bins == "Unknown", 1, 0))
 
 summary(model_data)
 
@@ -74,7 +77,3 @@ psem_mod <- psem(
 )
 psem_sum <- summary(psem_mod)
 psem_sum
-
-sink("psem.txt")
-print(psem_sum)
-sink() 

@@ -93,14 +93,43 @@ lake_freq <- figure_2_data %>%
   xlab("Species richness")+
   scale_y_continuous(expand = expansion(mult = c(0, 0.1)))
 
-figure_2 <- lake_map + lake_freq + plot_layout(ncol = 1) + plot_annotation(tag_levels = "A")
+
+#Spec vs age plot
+spec_vs_age_data <- figure_2_data %>% 
+  filter(lake_cat=="New" & lake_age <= 30)
+spec_vs_age_glm <- glm(n_spec_lake ~ lake_age, family = "poisson", data = spec_vs_age_data)
+summary(spec_vs_age_glm)
+
+ilink <- family(spec_vs_age_glm)$linkinv
+
+glm_pred_df <- data.frame(lake_age = 0:30) %>% 
+  mutate(fit_link = predict(spec_vs_age_glm, newdata= ., se.fit=TRUE)$fit, 
+         se_link = predict(spec_vs_age_glm, newdata= ., se.fit=TRUE)$se.fit) %>% 
+  mutate(fit_resp  = ilink(fit_link),
+         right_upr = ilink(fit_link + (2 * se_link)),
+         right_lwr = ilink(fit_link - (2 * se_link)))
+
+spec_vs_age <- figure_2_data %>% 
+  filter(lake_cat=="New") %>% 
+  st_drop_geometry() %>% 
+  ggplot(aes(lake_age, n_spec_lake))+
+  geom_ribbon(data = glm_pred_df, inherit.aes = FALSE, aes(x=lake_age, ymin=right_lwr, ymax=right_upr), fill=grey(0.7))+
+  geom_line(data = glm_pred_df, aes(y=fit_resp), size=1)+
+  geom_point()+
+  ylab("Species richness")+
+  xlab("Lake age (years)")
+
+figure_2 <- lake_map + lake_freq + spec_vs_age + plot_layout(ncol = 1) + plot_annotation(tag_levels = "A")
 
 figure_2
 
-ggsave(paste0(getwd(), "/figures/figure_2.png"), figure_2, units = "mm", width = 129, height = 160)
+ggsave(paste0(getwd(), "/figures/figure_2.png"), figure_2, units = "mm", width = 129, height = 234)
 
+#Figure 3 PSEM MODEL
 
+#Figure 4 watershed/lake species
 
+#Figure 5 PCOA
 
 
 
@@ -117,16 +146,11 @@ fish_species_wide <- fish_species_lakes %>%
   mutate(presence = 1) %>% 
   spread(fish_id, presence)
   
-
-
-
-
-
 spec_matrix <- fish_species_wide %>% 
   select(-gml_id, -lake_group, -lake_age_bins) %>% 
   as.matrix()
 spec_matrix[is.na(spec_matrix)] <- 0
-rownames(spec_matrix) <- 
+#rownames(spec_matrix) <- 
 
 library(vegan)
 spec_bray <- vegdist(spec_matrix, method="bray", binary = TRUE)
@@ -137,60 +161,3 @@ data.frame(dim1 = spec_pcoa$points[,1], dim2 = spec_pcoa$points[,2], dim3 = spec
   ggplot(aes(dim1, dim2, col=age))+
   geom_point()
 
-
-
-
-
-
-#Lake richness plots
-
-#Get observation as also used for modeling
-lake_map_age_df <- all_model_data %>% 
-  mutate(lake_age = ifelse(is.na(year_established), 9999, year-year_established),
-         lake_age_bins = cut(lake_age, breaks = c(-1, 10, 20, 50, 100, 10000), 
-                        labels = c("0-10", "10-20", "20-50", "50-100", "Natural")),
-         spec_prop = n_spec_lake/n_spec_basin,
-         nat_or_art = factor(ifelse(lake_age_bins == "Natural", "Natural", "New"), levels = c("New", "Natural"))) %>% 
-  filter(!is.na(basin_id)) %>% 
-  select(-tn_mg_l, -tp_mg_l, -plant_area_perc, -zmax_m, -alk_meq_l,
-         -lake_circum_log10, -plant_vol_perc, -zmean_m, -secchi_depth_m,
-         -year_established) %>% 
-  na.omit()
-  
-xlabs <- seq(8, 12, 1)
-ylabs <- seq(54.5, 57.5, 0.5)
-
-lake_map_age <- lake_map_age_df %>% 
-  ggplot() +
-  geom_sf(data = dk_border, col = "black", fill = NA)+
-  geom_sf(aes(col = lake_age_bins), size = 0.7)+
-  geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "red", linetype = 1, show.legend = FALSE)+
-  scale_colour_manual(values = c(viridisLite::viridis(4, direction = -1), "coral"), name = "Lake age (years)")+
-  guides(linetype = guide_legend(title = NULL, order = 2), colour = guide_legend(order = 1))+
-  scale_x_continuous(breaks = xlabs, labels = paste0(xlabs,'°E')) +
-  scale_y_continuous(breaks = ylabs, labels = paste0(ylabs,'°N'))
-
-lake_spec_prop <- lake_map_age_df %>% 
-  st_drop_geometry() %>% 
-  ggplot()+
-  geom_freqpoly(aes(spec_prop, col = nat_or_art))+
-  geom_histogram(aes(spec_prop), fill = NA, col = "black", binwidth = 0.04)+
-  scale_color_manual(values = c(viridisLite::viridis(1, begin = 0.5, end = 0.6), "coral"), name = "Lake group")+
-  ylab("Frequency")+
-  xlab("Richness ratio")
-
-lake_spec_prop_basin_rich <- lake_map_age_df %>% 
-  st_drop_geometry() %>% 
-  ggplot(aes(y=spec_prop, x = n_spec_basin, col = basin_area_m2)) +
-  geom_vline(xintercept = 10, linetype = 3)+
-  geom_point(size = 0.7)+
-  ylab("Richness ratio")+
-  xlab("Basin species richness")+
-  scale_colour_viridis_c(trans = "log10", name = expression(log[10]*"(basin area [m"^{2}*"])"), option = "D", begin = 0.1)
-
-lake_fig <- lake_map_age + lake_spec_prop + lake_spec_prop_basin_rich + 
-  plot_layout(ncol = 1) + 
-  plot_annotation(tag_levels = "A")
-
-ggsave(paste0(getwd(), "/figures/lake_richness.png"), lake_fig, units = "mm", width = 129, height = 200)
-ggsave(paste0(getwd(), "/figures/lake_richness.svg"), lake_fig, units = "mm", width = 129, height = 200)
