@@ -77,3 +77,7 @@ psem_mod <- psem(
 )
 psem_sum <- summary(psem_mod)
 psem_sum
+
+
+#one hot encode lake age bins
+#ice cover at basin level?

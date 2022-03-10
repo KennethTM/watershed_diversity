@@ -130,12 +130,10 @@ ggsave(paste0(getwd(), "/figures/figure_2.png"), figure_2, units = "mm", width =
 #Figure 4 watershed/lake species
 
 #Figure 5 PCOA
-
-
-
+library(vegan);library(viridisLite)
 fish_species_wide <- fish_species_lakes %>% 
   st_drop_geometry() %>% 
-  left_join(model_data_raw[,c("gml_id", "year_established")]) %>% 
+  left_join(model_data_raw[, c("gml_id", "year_established")]) %>% 
   mutate(lake_age = ifelse(is.na(year_established), 9999, year_sample - year_established),
          lake_age_bins = cut(lake_age, 
                              breaks = c(-1, 10, 20, 200, 10000), 
@@ -150,14 +148,28 @@ spec_matrix <- fish_species_wide %>%
   select(-gml_id, -lake_group, -lake_age_bins) %>% 
   as.matrix()
 spec_matrix[is.na(spec_matrix)] <- 0
-#rownames(spec_matrix) <- 
 
-library(vegan)
 spec_bray <- vegdist(spec_matrix, method="bray", binary = TRUE)
 spec_pcoa <- cmdscale(spec_bray, k=(nrow(spec_matrix)-1), eig=TRUE)
 
-data.frame(dim1 = spec_pcoa$points[,1], dim2 = spec_pcoa$points[,2], dim3 = spec_pcoa$points[,3],
-      age = fish_species_wide$lake_age_bins) %>% 
-  ggplot(aes(dim1, dim2, col=age))+
-  geom_point()
+pcoa_data <- data.frame(dim1 = spec_pcoa$points[,1], 
+                        dim2 = spec_pcoa$points[,2],
+                        lake_age_bins = fish_species_wide$lake_age_bins) %>% 
+  mutate(lake_cat = factor(ifelse(lake_age_bins == "Unknown", "Natural", "New"), levels = c("New", "Natural")))
 
+pcoa_hull <- pcoa_data %>%
+  group_by(lake_cat) %>% 
+  slice(chull(dim1, dim2))
+
+figure_5 <- pcoa_data %>% 
+  ggplot(aes(dim1, dim2, col=lake_age_bins, shape = lake_cat)) +
+  geom_polygon(data = pcoa_hull, fill=NA, col="black", aes(linetype=lake_cat))+
+  geom_point()+
+  scale_linetype_manual(values=c("Natural"=1, "New"= 3), name = "Lake group")+
+  scale_colour_manual(values = c(viridisLite::viridis(3, direction = -1, begin = 0.3), "black"), name = "Lake age (years)")+
+  scale_shape_manual(values = c("Natural" = 1, "New" = 19), name = "Lake group")+
+  guides(linetype = guide_legend(order = 3), colour = guide_legend(order = 1), shape = guide_legend(order = 2))+
+  xlab("1st PCoA dimension")+
+  ylab("2nd PCoA dimension")
+
+ggsave(paste0(getwd(), "/figures/figure_5.png"), figure_5, units = "mm", width = 129, height = 100)
