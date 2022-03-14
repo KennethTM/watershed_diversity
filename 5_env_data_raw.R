@@ -1,9 +1,11 @@
-source("libs_and_funcs.R")
+source("0_libs_and_funcs.R")
 
 #Prepare environmental data for further analysis:
 #Chemistry
 #Secchi depth
 #Bathymetry
+
+dk_border <- st_read(gis_database, layer = "dk_border")
 
 #Submerged macrophyte and depth rawdata from www.odaforalle.au.dk
 #Time period 01-01-1990 to 01-10-2020
@@ -59,7 +61,8 @@ lake_level_stats_sf <- lake_bathy %>%
   left_join(lake_coords) %>% 
   filter(!is.na(xutm_euref89_zone32)) %>% 
   rename(site_name = observationsstednavn, site_id = observationsstednr) %>% 
-  st_as_sf(coords = c("xutm_euref89_zone32", "yutm_euref89_zone32"), crs = dk_epsg)
+  st_as_sf(coords = c("xutm_euref89_zone32", "yutm_euref89_zone32"), crs = dk_epsg) %>% 
+  st_crop(dk_border)
 
 st_write(lake_level_stats_sf, dsn = gis_database, layer = "lake_bathy", delete_layer = TRUE)
 
@@ -103,33 +106,7 @@ lake_chem <- lake_secchi_chem_raw %>%
          site_id = observationsstednr, site_name = observationsstednavn)
 
 lake_chem_sf <- lake_chem %>% 
-  st_as_sf(coords = c("xutm_euref89_zone32", "yutm_euref89_zone32"), crs = dk_epsg)
+  st_as_sf(coords = c("xutm_euref89_zone32", "yutm_euref89_zone32"), crs = dk_epsg) %>% 
+  st_crop(dk_border)
 
 st_write(lake_chem_sf, dsn = gis_database, layer = "lake_chem", delete_layer = TRUE)
-
-# #Add gml_id to chemistry and plant data
-# #Export files as kml and edit interactively in Google Earth
-# dk_lakes_subset <- st_read(gis_database, layer = "dk_lakes_subset")
-# lake_chem <- st_read(gis_database, layer = "lake_chem")
-# lake_plant <- st_read(gis_database, layer = "lake_plants")
-# 
-# lake_chem %>% 
-#   select(site_id, site_name) %>% 
-#   distinct() %>% 
-#   st_write(paste0(getwd(), "/data_raw/files_to_fix/lake_chem_raw.kml"))
-# 
-# lake_plant %>% 
-#   select(site_id, site_name) %>% 
-#   distinct() %>% 
-#   st_write(paste0(getwd(), "/data_raw/files_to_fix/lake_plant_raw.kml"))
-# 
-# dk_lakes_subset %>% 
-#   st_write(paste0(getwd(), "/data_raw/files_to_fix/dk_lakes_subset.kml"))
-# 
-# #Import edited chem and plant files and add gml_ids to chem and plant tables
-# chem_newlakes <- read_csv(paste0(getwd(), "/data_processed/chem_newlakes.csv"))
-# 
-# dk_lakes_subset %>% 
-#   st_join(lake_chem %>% 
-#   select(site_id, site_name) %>% 
-#   distinct()) %>% st_drop_geometry() %>% View()

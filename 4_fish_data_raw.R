@@ -1,4 +1,6 @@
-source("libs_and_funcs.R")
+source("0_libs_and_funcs.R")
+
+dk_border <- st_read(gis_database, layer = "dk_border")
 
 #Prepare fish data for further analysis:
 #"New lakes project" data
@@ -107,7 +109,8 @@ fish_species_sub <- fish_species %>%
 #Write species data to gis database
 #Used to determine basin species richness
 fish_species_sub_sf <- fish_species_sub %>% 
-  st_as_sf(coords = c("Xutm_Euref89_Zone32", "Yutm_Euref89_Zone32"), crs = dk_epsg)
+  st_as_sf(coords = c("Xutm_Euref89_Zone32", "Yutm_Euref89_Zone32"), crs = dk_epsg) %>% 
+  st_crop(dk_border)
 
 st_write(fish_species_sub_sf, dsn = gis_database, layer = "fish_species_basin", delete_layer = TRUE)
 
@@ -123,7 +126,7 @@ atlas_clean <- atlas_raw %>%
 
 write_csv(atlas_clean, paste0(getwd(), "/data_processed/atlas_clean.csv"))
 
-#Lakes for investigation is sample with highest richness after 2006
+#Lakes for investigation is year with highest richness after 2006
 fish_species_richest_survey <- fish_species_sub %>% 
   filter(year_sample >= 2006,
          system == "lake") %>% 
@@ -146,7 +149,8 @@ fish_species_lakes_raw <- fish_species_richest_survey %>%
 
 #Write lake raw species data to gis database
 fish_species_lakes_raw_sf <- fish_species_lakes_raw %>% 
-  st_as_sf(coords = c("Xutm_Euref89_Zone32", "Yutm_Euref89_Zone32"), crs = dk_epsg)
+  st_as_sf(coords = c("Xutm_Euref89_Zone32", "Yutm_Euref89_Zone32"), crs = dk_epsg) %>% 
+  st_crop(dk_border)
 
 st_write(fish_species_lakes_raw_sf, dsn = gis_database, layer = "fish_species_lakes_raw", delete_layer = TRUE)
 
@@ -214,7 +218,8 @@ fish_species_lakes_edit <- bind_rows(lake_id_new_coord_zone32, lake_id_new_coord
 #Write lake species data to gis database with polygon id (gml_id)
 fish_species_lakes_edit_sf <- fish_species_lakes_edit %>% 
   st_as_sf(coords = c("Xutm_Euref89_Zone32_cor", "Yutm_Euref89_Zone32_cor"), crs = dk_epsg) %>% 
-  st_join(dk_lakes)
+  st_join(dk_lakes) %>% 
+  st_crop(dk_border)
 
 st_write(fish_species_lakes_edit_sf, dsn = gis_database, layer = "fish_species_lakes", delete_layer = TRUE)
 

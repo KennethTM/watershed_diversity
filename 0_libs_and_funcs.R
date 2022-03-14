@@ -1,7 +1,11 @@
 library(fasterize);library(sf);library(raster);library(rgdal);library(gdalUtils);
 library(tidyverse);library(readxl);library(lubridate);library(rgrass7);
 library(link2GI);library(patchwork);library(lwgeom);
-library(exactextractr);library(mapview);library(corrplot)
+library(exactextractr);library(mapview);library(corrplot);
+library(vegan);library(viridisLite);
+library(piecewiseSEM);library(lme4)
+
+#Load libraries and define useful functions and constants used in other scripts
 
 #Danish projection, as EPSG number, used for spatial analysis (UTM ZONE 32)
 dk_epsg <- 25832

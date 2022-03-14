@@ -1,4 +1,4 @@
-source("libs_and_funcs.R")
+source("0_libs_and_funcs.R")
 
 #Calculate attributes for each basin:
 #Ice-cover during last ice age
@@ -7,12 +7,14 @@ source("libs_and_funcs.R")
 #DEM morphometry
 
 #Load data
-basins <- st_read(gis_database, layer = "basins")
-dk_iceage <- st_read(gis_database, layer = "dk_iceage")
-dk_streams <- st_read(dsn = gis_database, layer = "dk_streams")
-dk_lakes <- st_read(dsn = gis_database, layer = "dk_lakes")
-corine_land_cover <- st_read(dsn = gis_database, layer = "corine_land_cover")
 dk_border <- st_read(gis_database, layer = "dk_border")
+dk_iceage <- st_read(gis_database, layer = "dk_iceage")
+dk_streams <- st_read(gis_database, layer = "dk_streams")
+dk_lakes <- st_read(gis_database, layer = "dk_lakes")
+corine_land_cover <- st_read(gis_database, layer = "corine_land_cover")
+basins <- st_read(gis_database, layer = "basins") %>% 
+  st_crop(dk_border) %>% 
+  st_cast("MULTIPOLYGON")
 
 #Ice cover
 ice_covered <- factor(st_intersects(dk_iceage, st_centroid(basins), sparse = FALSE))
@@ -55,36 +57,43 @@ basin_elev <- exact_extract(elev, basins, fun = c("min", "mean", "max"))
 names(basin_elev) <- paste0("basin_elev_", names(basin_elev), "_m")
 basin_slope <- exact_extract(slope, basins, fun = "mean")
 
-#Combine attributes to data.frame and save
-basin_attr <- bind_cols(basin_id = basins$basin_id, 
-                        ice_covered = ice_covered, 
-                        basin_lake_area[, "basin_lake_area_m2"],
-                        basin_stream_length[, "basin_stream_length_m"],
-                        basin_arti = basin_arti,
-                        basin_agri = basin_agri,
-                        basin_elev,
-                        basin_slope_prc = basin_slope)
-
-#Save data.frame
-saveRDS(basin_attr, paste0(getwd(), "/data_processed/basin_attr.rds"))
-
-
-#####
-
-
 #salinity at basin outlet
 sal_stack <- raster(paste0(getwd(), "/data_raw/global-reanalysis-phy-001-030-monthly_1638544155158.nc"), varname="so")
 sal_mean <- calc(sal_stack, mean)
 
-sal_pkt <- rasterToPoints(sal_mean) %>% 
-  as.data.frame() %>% 
-  rename(salinity=layer) %>% 
+sal_df <- as.data.frame(sal_mean, xy=TRUE) %>% 
+  as_tibble() %>% 
+  rename(salinity=layer)
+
+sal_df_notna <- sal_df %>% 
+  filter(!is.na(salinity)) %>% 
   st_as_sf(coords=c("x", "y"), crs = st_crs(sal_mean)) %>% 
   st_transform(dk_epsg)
 
-basins_sal <- basins %>% 
-  st_join(sal_pkt, join=st_nearest_feature) %>% 
-  st_drop_geometry() %>% 
-  select(basin_id, salinity)
+sal_df_na <- sal_df %>% 
+  filter(is.na(salinity)) %>% 
+  st_as_sf(coords=c("x", "y"), crs = st_crs(sal_mean)) %>% 
+  st_transform(dk_epsg) %>% 
+  select(-salinity) %>% 
+  st_join(sal_df_notna, join=st_nearest_feature)
 
-saveRDS(basins_sal, paste0(getwd(), "/data_processed/basins_sal.rds"))
+sal_df_filled <- rbind(sal_df_notna, sal_df_na)
+
+basin_salinity <- basins %>% 
+  st_centroid() %>% 
+  st_join(sal_df_filled, join=st_nearest_feature) %>% 
+  st_drop_geometry() %>% 
+  select(basin_id, salinity) %>% 
+  as_tibble()
+
+#Combine attributes to data.frame and save
+basin_attributes <- bind_cols(basin_id = basins$basin_id, ice_covered = ice_covered, 
+                              basin_lake_area[, "basin_lake_area_m2"], basin_stream_length[, "basin_stream_length_m"],
+                              basin_arti = basin_arti, basin_agri = basin_agri,
+                              basin_elev, basin_slope_prc = basin_slope) %>% 
+  left_join(basin_salinity) %>% 
+  mutate(basin_elev_range_m = basin_elev_max_m-basin_elev_min_m,
+         ice_covered = ifelse(ice_covered == TRUE, 1, 0))
+
+#Save data.frame
+write_csv(basin_attributes, paste0(getwd(), "/data_processed/basin_attributes.csv"))

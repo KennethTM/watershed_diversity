@@ -1,13 +1,13 @@
-source("libs_and_funcs.R")
+source("0_libs_and_funcs.R")
 
 #Write vector files for further processing to gis_database
 
 #Download Denmark polygon, cut Bornholm and reproject
-dk_border_raw <- getData("GADM", country = "DNK", level = 0, path = paste0(getwd(), "/data_raw"))
+dk_border_raw <- raster::getData("GADM", country = "DNK", level = 0, path = paste0(getwd(), "/data_raw"))
 
 dk_border <- dk_border_raw %>% 
   st_as_sf() %>% 	
-  st_crop(xmin = 8, ymin = 54.56, xmax = 14, ymax = 57.76) %>% 	
+  st_crop(xmin = 8, ymin = 54.6, xmax = 14, ymax = 57.8) %>% 	
   st_transform(dk_epsg)	
 
 st_write(dk_border, dsn = gis_database, layer = "dk_border", delete_layer = TRUE)
@@ -26,7 +26,6 @@ gdalwarp(srcfile = dhym,
          dstfile = paste0(getwd(), "/data_raw/dhym_10m.tif"),
          cutline = gis_database,
          cl = "dk_border",
-         crop_to_cutline = TRUE,
          overwrite = TRUE,
          dstnodata = -9999,
          r = "min",
@@ -50,7 +49,8 @@ dk_streams_clean <- dk_streams_raw %>%
   st_zm() %>% 
   select(gml_id) %>% 
   st_transform(dk_epsg) %>% 
-  mutate(stream_length_m = as.numeric(st_length(geometry)))
+  mutate(stream_length_m = as.numeric(st_length(centrelineGeometry))) %>% 
+  st_crop(dk_border)
 
 st_write(dk_streams_clean, dsn = gis_database, layer = "dk_streams", delete_layer = TRUE)
 
@@ -60,12 +60,12 @@ dk_lakes_raw <- st_read(paste0(getwd(), "/data_raw/DK_StandingWater.gml"))
 dk_lakes_clean <- dk_lakes_raw %>% 
   st_zm() %>% 
   select(gml_id, elevation) %>% 
-  st_transform(dk_epsg)
+  st_transform(dk_epsg) %>% 
+  st_crop(dk_border)
 
 #Add also a missing polygon to national lake polygon layer (OpenStreetMap)
 lillelund_engso <- st_read(paste0(getwd(), "/data_raw/lillelund_engso.kmz")) %>% 
-  mutate(gml_id = "lillelund_engso", 
-         elevation = 0) %>% 
+  mutate(gml_id = "lillelund_engso", elevation = 0) %>% 
   select(gml_id, elevation) %>% 
   st_zm() %>% 
   st_transform(dk_epsg)

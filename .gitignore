@@ -5,5 +5,7 @@
 data_raw/
 data_processed/
 gis_grass_database/
-figures/*.svg
 old/
+ek_docs/
+manuscript/
+figures/

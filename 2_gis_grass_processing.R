@@ -1,5 +1,8 @@
-source("libs_and_funcs.R")
+source("0_libs_and_funcs.R")
 
+#Load DEM, initiate GRASS GIS, import DEM, process, and export basins
+
+#Load 10m resolution DEM
 dhym_10m <- paste0(getwd(), "/data_raw/dhym_10m.tif")
 
 dhym_raster <- raster(dhym_10m)

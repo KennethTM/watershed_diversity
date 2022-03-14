@@ -1,14 +1,20 @@
-source("libs_and_funcs.R")
+source("0_libs_and_funcs.R")
 
-
-#IS BORNHOLM CUT OUT??
-
+#Combine basin and lake level data from different sources
 
 #Lake species count 
 fish_species_lakes <- st_read(gis_database, layer = "fish_species_lakes")
 
-lake_fish_ids <- fish_species_lakes$fish_id %>% unique() %>% na.omit()
+#Identify all species found in lake surveys and write to file
+lake_fish_ids <- fish_species_lakes %>% 
+  st_drop_geometry() %>% 
+  select(fish_id) %>% 
+  distinct() %>% 
+  na.omit()
 
+write_csv(lake_fish_ids, paste0(getwd(), "/data_processed/lake_fish_ids.csv"))
+
+#Count fish species
 lake_species_count <- fish_species_lakes %>% 
   st_drop_geometry() %>% 
   group_by(gml_id, site_id, site_name) %>% 
@@ -26,17 +32,21 @@ fish_species_basin <- st_read(dsn = gis_database, layer = "fish_species_basin")
 atlas_clean <- read_csv(paste0(getwd(), "/data_processed/atlas_clean.csv"))
 
 #Basin species count
-basin_species_count <- fish_species_basin %>% 
+basin_species <- fish_species_basin %>% 
   st_join(basins) %>% 
   st_drop_geometry() %>% 
   as_tibble() %>% 
   select(basin_id, fish_id) %>% 
   na.omit() %>% 
   bind_rows(atlas_clean) %>% 
-  filter(fish_id %in% lake_fish_ids) %>% 
+  filter(fish_id %in% lake_fish_ids) 
+
+basin_species_count <- basin_species %>% 
   group_by(basin_id) %>% 
   summarise(n_spec_basin = ifelse(all(is.na(fish_id)), 0, length(unique(fish_id))))
 
+#Write basin species and count to files
+write_csv(basin_species[, c("basin_id", "fish_id")], paste0(getwd(), "/data_processed/basin_species.csv"))
 write_csv(basin_species_count, paste0(getwd(), "/data_processed/basin_species_count.csv"))
 
 #Join bathy data
@@ -84,7 +94,7 @@ lake_chem_2 <- lake_species_count %>%
 
 lake_species_count_chem <- bind_rows(lake_chem_1, lake_chem_2)
 
-#Addtional lakes ages
+#Additional lakes ages
 new_lakes_other <- read_xlsx(paste0(getwd(), "/data_raw/new_lakes_other.xlsx")) 
 
 new_lakes_other_sf <- new_lakes_other %>% 
@@ -100,7 +110,7 @@ dk_lakes_subset_age <- dk_lakes_subset %>%
   na.omit()
 
 #Lakes basin data
-basin_attr <- readRDS(paste0(getwd(), "/data_processed/basin_attr.rds"))
+basin_attributes <- read_csv(paste0(getwd(), "/data_processed/basin_attributes.csv"))
 
 lake_basin_id <- dk_lakes_subset %>% 
   select(gml_id) %>% 
@@ -108,19 +118,29 @@ lake_basin_id <- dk_lakes_subset %>%
   st_join(basins[, "basin_id"]) %>%
   st_drop_geometry()
 
-basin_attr_all <- basin_attr %>% 
+basin_attr_all <- basin_attributes %>% 
   left_join(basin_species_count) %>% 
   left_join(st_drop_geometry(basins)) %>% 
   left_join(lake_basin_id)
 
 #Collect all data
-lake_species_all <- lake_species_count_bathy %>% 
+all_data_merge <- lake_species_count_bathy %>% 
   left_join(lake_species_count_chem) %>% 
   left_join(dk_lakes_subset_age) %>% 
   left_join(st_drop_geometry(dk_lakes_subset[,c("gml_id", "lake_stream_connect")])) %>% 
   mutate(year_established = coalesce(year_established, year_established_2)) %>% 
   select(-year_established_2) %>% 
-  left_join(basin_attr_all)
+  left_join(basin_attr_all) %>% 
+  rename(lake_stream_connect_n = lake_stream_connect) %>% 
+  mutate(lake_stream_connect = ifelse(lake_stream_connect_n > 0, 1, 0))
 
 #Write csv
-write_csv(lake_species_all, paste0(getwd(), "/data_processed/lake_species_all.csv"))
+write_csv(all_data_merge, paste0(getwd(), "/data_processed/model_data_raw.csv"))
+
+#Write lake species list to file
+lake_species <- fish_species_lakes %>% 
+  st_drop_geometry() %>% 
+  select(gml_id, fish_id) %>% 
+  left_join(lake_basin_id)
+
+write_csv(lake_species, paste0(getwd(), "/data_processed/lake_species.csv"))
