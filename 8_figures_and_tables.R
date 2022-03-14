@@ -12,7 +12,78 @@ dk_iceage_cut <- dk_iceage %>%
 model_data_psem <- read_csv(paste0(getwd(), "/data_processed/model_data_psem.csv")) %>% 
   mutate(lake_age_bins = factor(lake_age_bins, levels = c("0-10", "10-20", ">20", "Unknown")))
 
+model_data_proc <- read_csv(paste0(getwd(), "/data_processed/model_data_proc.csv")) 
+
 fish_species_lakes <- st_read(dsn = gis_database, layer = "fish_species_lakes")
+
+lake_fish_ids <- read_csv(paste0(getwd(), "/data_processed/lake_fish_ids.csv"))
+fish_species_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/fish_species_unique.xlsx"))
+
+#Supplementary material
+
+#Table S1
+#Fish species included in the analysis
+#27 species
+table_s1_species <- fish_species_unique_edit %>% 
+  filter(fish_id %in% lake_fish_ids$fish_id) %>% 
+  select(name_atlas, fish_id) %>% 
+  distinct() %>% 
+  filter(name_atlas != "Gynmocephalus_cernua") %>% 
+  mutate(name_atlas = gsub("_", " ", name_atlas)) 
+
+table_s1_species %>% 
+  select(-fish_id) %>% 
+  write_csv(paste0(getwd(), "/figures/table_s1.csv"))
+
+#Table S2
+#Drainage basin species richness and variables
+#98 basins
+table_s2 <- model_data_proc %>% 
+  filter(gml_id %in% model_data_psem$gml_id) %>%  
+  select(basin_lake_area_m2, basin_stream_length_m, basin_arti, basin_agri, basin_elev_mean_m,
+         basin_slope_prc, basin_area_m2, basin_circum_m, salinity, basin_elev_range_m, ice_covered, n_spec_basin) %>% 
+  distinct() %>% 
+  gather(variable, value) %>% 
+  group_by(variable) %>% 
+  summarise(Minimum=min(value), `1st quantile` = quantile(value, 0.25), Median=median(value), 
+            Mean=mean(value), `3rd quantile` = quantile(value, 0.75), Maximum=max(value)) %>% 
+  mutate(Note = case_when(variable == "n_spec_basin" ~ "Response",
+                          variable %in% c("basin_area_m2", "basin_circum_m", "basin_elev_range_m", "basin_stream_length_m") ~ "Discarded",
+                          TRUE ~ "Predictor")) %>% 
+  rename(Variable = variable) %>% 
+  arrange(desc(Note)) %>% 
+  relocate(Note, .after = Variable)
+
+table_s2
+
+write_csv(table_s2, paste0(getwd(), "/figures/table_s2.csv"))
+
+#Table 1
+#Species richness and lake drivers in natural and new danish lakes
+#193 natural + 34 new
+table_1 <- model_data_proc %>% 
+  filter(gml_id %in% model_data_psem$gml_id) %>%
+  mutate(lake_cat = ifelse(lake_natural == 1, "Natural", "New")) %>% 
+  select(lake_elev_m, shoreline_m, bathy_area, bathy_vol, bathy_zmean, bathy_zmax,
+         alk_mmol_l, chla_ug_l, tn_mg_l, ph_ph, tp_mg_l, secchi_depth_m,
+         n_spec_lake, lake_stream_connect, lake_cat) %>% 
+  gather(variable, value, -lake_cat) %>% 
+  group_by(variable, lake_cat) %>% 
+  summarise(Minimum=min(value), `1st quantile` = quantile(value, 0.25), Median=median(value), 
+            Mean=mean(value), `3rd quantile` = quantile(value, 0.75), Maximum=max(value)) %>% 
+  ungroup() %>% 
+  gather(stat, value, Minimum:Maximum) %>% 
+  mutate(lake_cat_stat = paste0(lake_cat, "-", stat)) %>% 
+  select(variable, lake_cat_stat, value) %>% 
+  spread(lake_cat_stat, value) %>% 
+  mutate(Note = case_when(variable == "n_spec_lake" ~ "Response",
+                          variable %in% c("bathy_zmean", "bathy_vol", "shoreline_m", "chla_ug_l") ~ "Discarded",
+                          TRUE ~ "Predictor")) %>% 
+  rename(Variable = variable) %>% 
+  arrange(desc(Note)) %>% 
+  relocate(Note, .after = Variable)
+
+write_csv(table_1, paste0(getwd(), "/figures/table_1.csv"))
 
 #Figure 1
 #Drainage basin species richness
@@ -167,104 +238,55 @@ figure_4
 
 ggsave(paste0(getwd(), "/figures/figure_4.png"), figure_4, units = "mm", width = 129, height = 100)
 
-
-
-#Figure 5 watershed/lake species
+#Figure 5 basin-lake species
 #Load and add to basin and lake species lists for species specific analysis
-#Only include lake and basins used in modeling
-# fish_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/", "fish_unique_edit_EK.xlsx")) %>% 
-#   select(name = name_to_use, name_novana = name_local_novana, name_atlas = latin_and_atlas,
-#          fish_id = ID, action = `how(0=do_nothing)(1=remove_species)(2=remove_lake)`) %>% 
-#   filter(action == 0) %>% 
-#   select(name_atlas, fish_id) %>% 
-#   distinct() %>% 
-#   slice(-25)
-# 
-# bas <- read_csv(paste0(getwd(), "/data_raw/basin_species_list.csv"))
-# 
-# lak <- read_csv(paste0(getwd(), "/data_raw/lake_species_list.csv")) 
-# 
-# lak_sub <- bind_rows(add_column(natural_lakes, system = "natural"), 
-#                      add_column(new_lakes, system = "new")) %>% 
-#   mutate(basin_id = as.numeric(as.character(basin_id_fact))) %>% 
-#   select(system, basin_id, site_id) %>% 
-#   left_join(select(lak, site_id, fish_id)) %>% 
-#   distinct()
-# 
-# bas_sub <- bas %>%
-#   select(basin_id, fish_id) %>% 
-#   filter(basin_id %in% lak_sub$basin_id) %>% 
-#   distinct()
-# 
-# lak_per_bas <- lak_sub %>% 
-#   select(system, basin_id, site_id) %>% 
-#   distinct() %>% 
-#   group_by(system, basin_id) %>% 
-#   summarise(n_lake = n())
-# 
-# lak_per_spec <- lak_sub %>%
-#   group_by(system, fish_id) %>%
-#   summarise(n_lake_spec = n())
-# 
-# bas_per_spec <- bas_sub %>%
-#   group_by(fish_id) %>%
-#   summarise(n_bas_spec = n())
-# 
-# new_lake_freq <- left_join(bas_sub, lak_sub) %>%
-#   filter(system == "new" | is.na(system)) %>% 
-#   group_by(fish_id, basin_id) %>% 
-#   summarise(n_occur = sum(!is.na(site_id))) %>%
-#   left_join(filter(lak_per_bas, system == "new")) %>%
-#   na.omit() %>% 
-#   summarise(spec_mean = mean(n_occur/n_lake)) %>% 
-#   left_join(fish_unique_edit) 
-# 
-# nat_lake_freq <- left_join(bas_sub, lak_sub) %>%
-#   filter(system == "natural" | is.na(system)) %>% 
-#   group_by(fish_id, basin_id) %>% 
-#   summarise(n_occur = sum(!is.na(site_id))) %>%
-#   left_join(filter(lak_per_bas, system == "natural")) %>%
-#   na.omit() %>% 
-#   summarise(spec_mean = mean(n_occur/n_lake)) %>% 
-#   left_join(fish_unique_edit) 
-# 
-# spec_freq_plot <- bind_rows(add_column(nat_lake_freq, system = "natural"), 
-#                             add_column(new_lake_freq, system = "new")) %>% 
-#   left_join(lak_per_spec) %>% 
-#   left_join(bas_per_spec) %>%
-#   na.omit() %>% 
-#   mutate(label = gsub("_", " ", name_atlas),
-#          lake_cat = ifelse(system == "natural", "Natural", "New"),
-#          lake_cat_fact = factor(ifelse(lake_cat == "Natural", "Natural", "New"), levels = c("New", "Natural")),
-#          label_n_bas = paste0(label, " (", n_bas_spec, ")"),
-#          n_lakes_sys = ifelse(lake_cat == "New", nrow(new_lakes), nrow(natural_lakes)),
-#          n_lake_spec_prop = n_lake_spec/n_lakes_sys*100) %>% 
-#   #ggplot(aes(x = reorder(label_n_bas, spec_mean), y = spec_mean, col = lake_cat_fact, size = n_lake_spec))+
-#   ggplot(aes(x = reorder(label_n_bas, spec_mean), y = spec_mean, col = lake_cat_fact, size = n_lake_spec_prop))+
-#   geom_point()+
-#   scale_colour_manual(values = c(viridisLite::viridis(1, begin = 0.5, end = 0.6), "coral"), name = "Lake age (years)")+
-#   scale_size(name = "Occurrences (%)", breaks = seq(0, 100, 25))+
-#   scale_y_continuous(breaks = seq(0, 1, 0.1), limits = c(0, 1))+
-#   coord_flip()+
-#   xlab("Species")+
-#   ylab("Average frequency")+
-#   theme(panel.grid.major.y = element_line(size = 0.5, colour = "grey"),
-#         legend.position = c(0.75, 0.24),
-#         axis.text.y = element_text(face = "italic"),
-#         legend.background = element_rect(colour = "black", size = 0.25))
-# 
-# ggsave(paste0(getwd(), "/figures/lake_spec_freq.png"), spec_freq_plot, units = "mm", width = 129, height = 150)
-# ggsave(paste0(getwd(), "/figures/lake_spec_freq.svg"), spec_freq_plot, units = "mm", width = 129, height = 150)
+lake_species <- read_csv(paste0(getwd(), "/data_processed/lake_species.csv")) %>% 
+  filter(is.na(fish_id) | fish_id %in% lake_fish_ids$fish_id & gml_id %in% model_data_psem$gml_id) %>% 
+  left_join(model_data_psem[,c("gml_id", "lake_natural")]) %>% 
+  mutate(lake_cat = ifelse(lake_natural == 1, "Natural", "New")) %>% 
+  select(-lake_natural)
 
-#Table 1
-#Species richness and lake drivers in natural and new danish lakes
+basin_species <- read_csv(paste0(getwd(), "/data_processed/basin_species.csv")) %>% 
+  filter(fish_id %in% lake_fish_ids$fish_id & basin_id %in% model_data_psem$basin_id) %>% 
+  left_join(model_data_psem[,c("basin_id", "lake_natural")]) %>% 
+  mutate(lake_cat = ifelse(lake_natural == 1, "Natural", "New")) %>% 
+  select(-lake_natural) %>% 
+  distinct()
 
-#Supplementary material
+lake_per_basin <- lake_species %>% 
+  select(lake_cat, basin_id, gml_id) %>% 
+  distinct() %>% 
+  group_by(basin_id, lake_cat) %>% 
+  summarise(n_lake = n())
 
-#Table S1
-#Fish species included in the analysis
-fish_species_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/fish_species_unique.xlsx"))
-lake_fish_ids <- read_csv(paste0(getwd(), "/data_processed/lake_fish_ids.csv"))
+basin_per_spec <- basin_species %>% 
+  select(basin_id, fish_id) %>% 
+  distinct() %>% 
+  group_by(fish_id) %>% 
+  summarise(n_basin_spec = n())
 
-#Table S2
-#Drainage basin predictor variables
+figure_5_data <- inner_join(basin_species, lake_species) %>% 
+  group_by(fish_id, lake_cat, basin_id) %>% 
+  summarise(n_occur = n()) %>% 
+  left_join(lake_per_basin) %>% 
+  summarise(spec_mean = mean(n_occur/n_lake)) %>% 
+  left_join(basin_per_spec) %>% 
+  left_join(table_s1_species) %>% 
+  mutate(name_label = paste0(name_atlas, " (", n_basin_spec, ")"))
+
+figure_5 <- figure_5_data %>% 
+  ggplot(aes(x = reorder(name_label, spec_mean), y = spec_mean, shape = lake_cat))+
+  geom_point()+
+  scale_y_continuous(breaks = seq(0, 1, 0.25), limits = c(0, 1))+
+  coord_flip()+
+  scale_shape_manual(values = c("Natural" = 1, "New" = 19), name = "Lake group")+
+  xlab("Species")+
+  ylab("Average frequency")+
+  theme(panel.grid.major.y = element_line(size = 0.5, colour = "grey"),
+        legend.position = c(0.35, 0.90),
+        axis.text.y = element_text(face = "italic"),
+        legend.background = element_rect(colour = "black", size = 0.25))
+
+figure_5
+
+ggsave(paste0(getwd(), "/figures/figure_5.png"), figure_5, units = "mm", width = 129, height = 150)
