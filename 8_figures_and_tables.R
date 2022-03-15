@@ -265,11 +265,12 @@ basin_per_spec <- basin_species %>%
   group_by(fish_id) %>% 
   summarise(n_basin_spec = n())
 
-figure_5_data <- inner_join(basin_species, lake_species) %>% 
+figure_5_data <- left_join(basin_species, lake_species) %>% 
   group_by(fish_id, lake_cat, basin_id) %>% 
-  summarise(n_occur = n()) %>% 
+  summarise(n_occur = sum(!is.na(gml_id))) %>% 
   left_join(lake_per_basin) %>% 
   summarise(spec_mean = mean(n_occur/n_lake)) %>% 
+  filter(spec_mean > 0) %>% 
   left_join(basin_per_spec) %>% 
   left_join(table_s1_species) %>% 
   mutate(name_label = paste0(name_atlas, " (", n_basin_spec, ")"))
@@ -283,7 +284,7 @@ figure_5 <- figure_5_data %>%
   xlab("Species")+
   ylab("Average frequency")+
   theme(panel.grid.major.y = element_line(size = 0.5, colour = "grey"),
-        legend.position = c(0.35, 0.90),
+        legend.position = c(0.7, 0.15),
         axis.text.y = element_text(face = "italic"),
         legend.background = element_rect(colour = "black", size = 0.25))
 
