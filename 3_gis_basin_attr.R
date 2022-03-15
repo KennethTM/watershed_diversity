@@ -57,7 +57,9 @@ basin_elev <- exact_extract(elev, basins, fun = c("min", "mean", "max"))
 names(basin_elev) <- paste0("basin_elev_", names(basin_elev), "_m")
 basin_slope <- exact_extract(slope, basins, fun = "mean")
 
-#salinity at basin outlet
+#Salinity at basin outlet
+#https://resources.marine.copernicus.eu/product-detail/GLOBAL_REANALYSIS_PHY_001_031/INFORMATION
+#https://help.marine.copernicus.eu/en/articles/4444611-how-to-cite-or-reference-copernicus-marine-products-and-services#publication
 sal_stack <- raster(paste0(getwd(), "/data_raw/global-reanalysis-phy-001-030-monthly_1638544155158.nc"), varname="so")
 sal_mean <- calc(sal_stack, mean)
 

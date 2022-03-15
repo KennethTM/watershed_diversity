@@ -35,47 +35,70 @@ table_s1_species %>%
   select(-fish_id) %>% 
   write_csv(paste0(getwd(), "/figures/table_s1.csv"))
 
-#Table S2
+#Tables in manuscript
+
+#Table 1
 #Drainage basin species richness and variables
 #98 basins
-table_s2 <- model_data_proc %>% 
+table_1 <- model_data_proc %>% 
   filter(gml_id %in% model_data_psem$gml_id) %>%  
   select(basin_lake_area_m2, basin_stream_length_m, basin_arti, basin_agri, basin_elev_mean_m,
          basin_slope_prc, basin_area_m2, basin_circum_m, salinity, basin_elev_range_m, ice_covered, n_spec_basin) %>% 
   distinct() %>% 
+  mutate(basin_lake_area_m2 = basin_lake_area_m2*10^-4,
+         basin_area_m2 = basin_area_m2*10^-4,
+         basin_stream_length_m = basin_stream_length_m*10^-3,
+         basin_circum_m = basin_circum_m*10^-3,
+         basin_arti = basin_arti*100,
+         basin_agri = basin_agri*100) %>% 
   gather(variable, value) %>% 
   group_by(variable) %>% 
-  summarise(Minimum=min(value), `1st quantile` = quantile(value, 0.25), Median=median(value), 
-            Mean=mean(value), `3rd quantile` = quantile(value, 0.75), Maximum=max(value)) %>% 
+  summarise(Minimum=min(value), 
+            #`1st quantile` = quantile(value, 0.25), 
+            #Median=median(value), 
+            Mean=mean(value), 
+            #`3rd quantile` = quantile(value, 0.75), 
+            Maximum=max(value)) %>% 
   mutate(Note = case_when(variable == "n_spec_basin" ~ "Response",
                           variable %in% c("basin_area_m2", "basin_circum_m", "basin_elev_range_m", "basin_stream_length_m") ~ "Discarded",
                           TRUE ~ "Predictor")) %>% 
+  mutate(Minimum = signif(Minimum, 2),
+         Mean = signif(Mean, 2),
+         Maximum = signif(Maximum, 2)) %>% 
   rename(Variable = variable) %>% 
   arrange(desc(Note)) %>% 
   relocate(Note, .after = Variable)
 
-table_s2
+table_1
 
-write_csv(table_s2, paste0(getwd(), "/figures/table_s2.csv"))
+write_csv(table_1, paste0(getwd(), "/figures/table_1.csv"))
 
-#Table 1
+#Table 2
 #Species richness and lake drivers in natural and new danish lakes
 #193 natural + 34 new
-table_1 <- model_data_proc %>% 
+table_2 <- model_data_proc %>% 
   filter(gml_id %in% model_data_psem$gml_id) %>%
   mutate(lake_cat = ifelse(lake_natural == 1, "Natural", "New")) %>% 
   select(lake_elev_m, shoreline_m, bathy_area, bathy_vol, bathy_zmean, bathy_zmax,
          alk_mmol_l, chla_ug_l, tn_mg_l, ph_ph, tp_mg_l, secchi_depth_m,
          n_spec_lake, lake_stream_connect, lake_cat) %>% 
+  mutate(bathy_vol = bathy_vol*10^-3,
+         bathy_area = bathy_area*10^-4,
+         shoreline_m = shoreline_m*10^-3) %>% 
   gather(variable, value, -lake_cat) %>% 
   group_by(variable, lake_cat) %>% 
-  summarise(Minimum=min(value), `1st quantile` = quantile(value, 0.25), Median=median(value), 
-            Mean=mean(value), `3rd quantile` = quantile(value, 0.75), Maximum=max(value)) %>% 
+  summarise(Minimum=min(value), 
+            #`1st quantile` = quantile(value, 0.25), 
+            #Median=median(value), 
+            Mean=mean(value), 
+            #`3rd quantile` = quantile(value, 0.75), 
+            Maximum=max(value)) %>% 
   ungroup() %>% 
   gather(stat, value, Minimum:Maximum) %>% 
-  mutate(lake_cat_stat = paste0(lake_cat, "-", stat)) %>% 
-  select(variable, lake_cat_stat, value) %>% 
-  spread(lake_cat_stat, value) %>% 
+  mutate(lake_cat_stat = paste0(lake_cat, "-", stat),
+         value_round = signif(value, 2)) %>% 
+  select(variable, lake_cat_stat, value_round) %>% 
+  spread(lake_cat_stat, value_round) %>% 
   mutate(Note = case_when(variable == "n_spec_lake" ~ "Response",
                           variable %in% c("bathy_zmean", "bathy_vol", "shoreline_m", "chla_ug_l") ~ "Discarded",
                           TRUE ~ "Predictor")) %>% 
@@ -83,7 +106,9 @@ table_1 <- model_data_proc %>%
   arrange(desc(Note)) %>% 
   relocate(Note, .after = Variable)
 
-write_csv(table_1, paste0(getwd(), "/figures/table_1.csv"))
+write_csv(table_2, paste0(getwd(), "/figures/table_2.csv"))
+
+#Figures in manuscript
 
 #Figure 1
 #Drainage basin species richness
