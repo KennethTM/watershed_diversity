@@ -177,8 +177,8 @@ lake_freq <- figure_2_data %>%
   st_drop_geometry() %>% 
   ggplot(aes(x=n_spec_lake))+
   geom_histogram(fill = "grey", col = "white", binwidth = 1)+
-  geom_density(aes(y=..count.., col = lake_cat), position = position_stack())+
-  scale_color_manual(values = c(viridisLite::viridis(4, direction = -1, begin = 0.3)[2], "black"), name = "Lake group")+
+  geom_density(aes(y=..count.., linetype = lake_cat), position = position_stack())+
+  scale_linetype_manual(values=c("Natural"=1, "New"= 3), name = "Lake group")+
   ylab("Frequency")+
   xlab("Species richness")+
   scale_y_continuous(expand = expansion(mult = c(0, 0.1)))
@@ -216,7 +216,7 @@ figure_2 <- lake_map + lake_freq + spec_vs_age + plot_layout(ncol = 1, heights =
 
 figure_2
 
-ggsave(paste0(getwd(), "/figures/figure_2.png"), figure_2, units = "mm", width = 129, height = 234)
+ggsave(paste0(getwd(), "/figures/figure_2.png"), figure_2, units = "mm", width = 129, height = 200)
 
 #Figure 3 PSEM MODEL
 
