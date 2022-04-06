@@ -88,3 +88,9 @@ psem_sum
 sink(paste0(getwd(), "/data_processed/psem_summary.txt"))
 psem_sum
 dev.off()
+
+#Normalize standardized parameter estimates to adjust line widths (range 0.01 - 0.1) in figure
+as.data.frame(coefs(psem_mod)) %>% 
+  select(1:3) %>% 
+  mutate(estimate_abs = abs(Estimate),
+         line_widths = (0.1 - 0.01) / (max(estimate_abs)-min(estimate_abs)) * (estimate_abs - max(estimate_abs)) + 0.1)
