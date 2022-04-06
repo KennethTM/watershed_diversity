@@ -19,6 +19,12 @@ fish_species_lakes <- st_read(dsn = gis_database, layer = "fish_species_lakes")
 lake_fish_ids <- read_csv(paste0(getwd(), "/data_processed/lake_fish_ids.csv"))
 fish_species_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/fish_species_unique.xlsx"))
 
+#Mann Whitney U-test
+wilcox.test(model_data_psem$n_spec_lake ~ model_data_psem$lake_age_bins == "Unknown")
+
+#Mean age
+mean(model_data_psem[model_data_psem$lake_age_bins != "Unknown", ]$lake_age)
+
 #Supplementary material
 
 #Table S1
@@ -120,7 +126,10 @@ basins_count <- basins %>%
   mutate(n_spec_basin = ifelse(is.na(n_spec_basin), 0, n_spec_basin)) %>% 
   st_crop(st_bbox(dk_border))
 
+#Stats for drainage basin species richness
 table(basins_count$n_spec_basin)
+summary(basins_count$n_spec_basin)
+summary(basins_count$n_spec_basin[basins_count$n_spec_basin > 0])
 
 basin_freq <- basins_count %>% 
   ggplot(aes(n_spec_basin))+
@@ -220,7 +229,7 @@ ggsave(paste0(getwd(), "/figures/figure_2.png"), figure_2, units = "mm", width =
 
 #Figure 3 PSEM MODEL
 
-#Figure 4 PCOA
+#Figure 4 NMDS
 fish_species_wide <- fish_species_lakes %>%
   st_drop_geometry() %>% 
   as_tibble() %>% 
@@ -228,36 +237,39 @@ fish_species_wide <- fish_species_lakes %>%
   select(gml_id, lake_natural, lake_age_bins, fish_id, lake_stream_connect) %>% 
   na.omit() %>% #remove no catch lakes
   mutate(presence = 1) %>% 
-  spread(fish_id, presence)
+  spread(fish_id, presence) %>% 
+  slice(-197) #outlier
   
 spec_matrix <- fish_species_wide %>% 
   select(-gml_id, -lake_natural, -lake_age_bins, -lake_stream_connect) %>% 
   as.matrix()
 spec_matrix[is.na(spec_matrix)] <- 0
 
-spec_bray <- vegdist(spec_matrix, method="bray", binary = TRUE)
-spec_pcoa <- cmdscale(spec_bray, k=(nrow(spec_matrix)-1), eig=TRUE)
+spec_bray <- vegdist(spec_matrix, method="bray")
+#spec_nmds <- cmdscale(spec_bray, k=(nrow(spec_matrix)-1), eig=TRUE)
 
-pcoa_data <- data.frame(dim1 = spec_pcoa$points[,1], 
-                        dim2 = spec_pcoa$points[,2],
+spec_nmds <- metaMDS(spec_bray, distance = "bray", k = 3, maxit = 1000, trymax = 500, wascores = TRUE, noshare=TRUE)
+
+nmds_data <- data.frame(dim1 = spec_nmds$points[, 1], 
+                        dim2 = spec_nmds$points[, 2],
                         lake_age_bins = fish_species_wide$lake_age_bins,
                         lake_stream_connect = fish_species_wide$lake_stream_connect) %>% 
   mutate(lake_cat = factor(ifelse(lake_age_bins == "Unknown", "Natural", "New"), levels = c("New", "Natural")))
 
-pcoa_hull <- pcoa_data %>%
+nmds_hull <- nmds_data %>%
   group_by(lake_cat) %>% 
   slice(chull(dim1, dim2))
 
-figure_4 <- pcoa_data %>% 
+figure_4 <- nmds_data %>% 
   ggplot(aes(dim1, dim2, col=lake_age_bins, shape = lake_cat)) +
-  geom_polygon(data = pcoa_hull, fill=NA, col="black", aes(linetype=lake_cat))+
+  geom_polygon(data = nmds_hull, fill=NA, col="black", aes(linetype=lake_cat))+
   geom_point()+
   scale_linetype_manual(values=c("Natural"=1, "New"= 3), name = "Lake group")+
   scale_colour_manual(values = c(viridisLite::viridis(3, direction = -1, begin = 0.3), "black"), name = "Lake age (years)")+
   scale_shape_manual(values = c("Natural" = 1, "New" = 19), name = "Lake group")+
   guides(linetype = guide_legend(order = 3), colour = guide_legend(order = 1), shape = guide_legend(order = 2))+
-  xlab("1st PCoA dimension")+
-  ylab("2nd PCoA dimension")
+  xlab("1st NMDS dimension")+
+  ylab("2nd NMDS dimension")
 
 figure_4
 
