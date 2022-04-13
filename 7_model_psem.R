@@ -94,3 +94,16 @@ as.data.frame(coefs(psem_mod)) %>%
   select(1:3) %>% 
   mutate(estimate_abs = abs(Estimate),
          line_widths = (0.1 - 0.01) / (max(estimate_abs)-min(estimate_abs)) * (estimate_abs - max(estimate_abs)) + 0.1)
+
+#Emmeans estimates
+lake_level <- glmer(n_spec_lake ~ n_spec_basin+lake_elev_m+bathy_area+bathy_zmax+
+              alk_mmol_l+tn_mg_l+ph_ph+tp_mg_l+secchi_depth_m+
+              lake_stream_connect+lake_natural+lake_stream_connect:lake_natural+(1|basin_id),
+            data = mutate(model_data_psem,
+                          lake_stream_connect = as.factor(ifelse(lake_stream_connect == 1, "connect", "disconnect")),
+                          lake_natural = as.factor(ifelse(lake_natural == 1, "natural", "new"))), family = "poisson", nAGQ=0)
+
+lake_level_em <- emmeans(lake_level,  ~ lake_natural*lake_stream_connect)
+
+emmip(lake_level, lake_natural ~ lake_stream_connect)
+emmeans(lake_level, specs= pairwise ~ lake_natural * lake_stream_connect)
