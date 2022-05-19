@@ -1,9 +1,11 @@
-library(fasterize);library(sf);library(raster);library(rgdal);library(gdalUtils);
+library(fasterize);library(sf);library(raster);library(rgdal);
 library(tidyverse);library(readxl);library(lubridate);library(rgrass7);
 library(link2GI);library(patchwork);library(lwgeom);
 library(exactextractr);library(mapview);library(corrplot);
 library(vegan);library(viridisLite);
-library(piecewiseSEM);library(lme4);library(emmeans)
+library(piecewiseSEM);library(lme4);library(emmeans);library(FSA)
+
+#;library(gdalUtils)
 
 #Load libraries and define useful functions and constants used in other scripts
 

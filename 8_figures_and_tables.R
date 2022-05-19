@@ -22,6 +22,17 @@ fish_species_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/fish_species_un
 #Mann Whitney U-test
 wilcox.test(model_data_psem$n_spec_lake ~ model_data_psem$lake_age_bins == "Unknown")
 
+#Kruskal Wallis test
+kw_data <- model_data_psem |> 
+  mutate(connection = ifelse(lake_stream_connect == 0, "disconnected", "connected"),
+         natural = ifelse(lake_natural == 1, "natural", "new"),
+         groups = paste0(connection, "_", natural)) |> 
+  select(n_spec_lake, groups)
+
+kw_test <- kruskal.test(n_spec_lake ~ groups, data = kw_data)
+
+dunnTest(n_spec_lake ~ groups, data = kw_data, method="bonferroni")
+
 #Mean age
 mean(model_data_psem[model_data_psem$lake_age_bins != "Unknown", ]$lake_age)
 
@@ -133,7 +144,7 @@ summary(basins_count$n_spec_basin[basins_count$n_spec_basin > 0])
 
 basin_freq <- basins_count %>% 
   ggplot(aes(n_spec_basin))+
-  geom_histogram(col = "white", fill = "grey", binwidth = 1)+
+  geom_histogram(col = "black", fill = "white", binwidth = 1)+
   scale_y_continuous(expand = expansion(mult = c(0, 0.1)))+
   coord_cartesian(ylim=c(0, 155))+
   annotate("segment", x = 0, xend = 2, y = 155, yend = 160, colour = "black")+
@@ -176,18 +187,19 @@ figure_2_data <- model_data_psem %>%
 lake_map <- figure_2_data %>% 
   ggplot() +
   geom_sf(data = dk_border, col = "grey", fill = NA)+
-  geom_sf(aes(col = lake_age_bins, shape = lake_cat), size = 0.7)+
+  geom_sf(aes(col = lake_cat), size = 0.7)+
   geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "coral", linetype = 1, show.legend = FALSE)+
-  scale_colour_manual(values = c(viridisLite::viridis(3, direction = -1, begin = 0.3), "black"), name = "Lake age (years)")+
-  scale_shape_manual(values = c("Natural" = 1, "New" = 19), name = "Lake group")+
-  guides(linetype = guide_legend(title = NULL, order = 2), colour = guide_legend(order = 1))
+  scale_colour_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")
+  #scale_shape_manual(values = c("Natural" = 1, "New" = 19), name = "Lake group")+
+  #guides(linetype = guide_legend(title = NULL, order = 2), colour = guide_legend(order = 1))
 
 lake_freq <- figure_2_data %>% 
   st_drop_geometry() %>% 
   ggplot(aes(x=n_spec_lake))+
-  geom_histogram(fill = "grey", col = "white", binwidth = 1)+
-  geom_density(aes(y=..count.., linetype = lake_cat), position = position_stack())+
-  scale_linetype_manual(values=c("Natural"=1, "New"= 3), name = "Lake group")+
+  geom_histogram(fill = "white", col = "black", binwidth = 1)+
+  geom_density(aes(y=..count.., col = lake_cat), position = position_stack())+
+  #scale_linetype_manual(values=c("Natural"=1, "New"= 3), name = "Lake group")+
+  scale_colour_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")+
   ylab("Frequency")+
   xlab("Species richness")+
   scale_y_continuous(expand = expansion(mult = c(0, 0.1)))
@@ -213,11 +225,11 @@ spec_vs_age <- figure_2_data %>%
   filter(lake_cat=="New") %>% 
   st_drop_geometry() %>% 
   mutate(`Stream network` = ifelse(lake_stream_connect == 1, "Connected", "Not connected")) %>% 
-  ggplot(aes(lake_age, n_spec_lake, col=`Stream network`))+
+  ggplot(aes(lake_age, n_spec_lake, shape=`Stream network`))+
   #geom_ribbon(data = glm_pred_df, inherit.aes = FALSE, aes(x=lake_age, ymin=right_lwr, ymax=right_upr), fill=grey(0.7))+
   #geom_line(data = glm_pred_df, aes(y=fit_resp), size=1)+
   geom_point()+
-  scale_color_manual(values = c("Connected" = "dodgerblue", "Not connected" ="grey"))+
+  scale_shape_manual(values = c("Connected" = 19, "Not connected" = 1))+
   ylab("Species richness")+
   xlab("Lake age (years)")
 
@@ -254,22 +266,23 @@ nmds_data <- data.frame(dim1 = spec_nmds$points[, 1],
                         dim2 = spec_nmds$points[, 2],
                         lake_age_bins = fish_species_wide$lake_age_bins,
                         lake_stream_connect = fish_species_wide$lake_stream_connect) %>% 
-  mutate(lake_cat = factor(ifelse(lake_age_bins == "Unknown", "Natural", "New"), levels = c("New", "Natural")))
+  mutate(lake_cat = factor(ifelse(lake_age_bins == "Unknown", "Natural", "New"), levels = c("New", "Natural")),
+         `Stream network` = ifelse(lake_stream_connect == 1, "Connected", "Not connected"))
 
 nmds_hull <- nmds_data %>%
   group_by(lake_cat) %>% 
   slice(chull(dim1, dim2))
 
 figure_4 <- nmds_data %>% 
-  ggplot(aes(dim1, dim2, col=lake_age_bins, shape = lake_cat)) +
-  geom_polygon(data = nmds_hull, fill=NA, col="black", aes(linetype=lake_cat))+
+  ggplot(aes(dim1, dim2, shape=`Stream network`, col = lake_cat)) +
+  geom_polygon(data = nmds_hull, inherit.aes = FALSE, aes(x=dim1, y=dim2, col=lake_cat), fill=NA, show.legend = FALSE)+
   geom_point()+
-  scale_linetype_manual(values=c("Natural"=1, "New"= 3), name = "Lake group")+
-  scale_colour_manual(values = c(viridisLite::viridis(3, direction = -1, begin = 0.3), "black"), name = "Lake age (years)")+
-  scale_shape_manual(values = c("Natural" = 1, "New" = 19), name = "Lake group")+
+  #scale_linetype_manual(values=c("Natural"= 3, "New"= 1), name = "Lake group")+
+  scale_shape_manual(values = c("Connected" = 19, "Not connected" = 1))+
+  scale_color_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")+
   guides(linetype = guide_legend(order = 3), colour = guide_legend(order = 1), shape = guide_legend(order = 2))+
-  xlab("1st NMDS dimension")+
-  ylab("2nd NMDS dimension")
+  xlab("NMDS1")+
+  ylab("NMDS2")
 
 figure_4
 
@@ -313,11 +326,11 @@ figure_5_data <- left_join(basin_species, lake_species) %>%
   mutate(name_label = paste0(name_atlas, " (", n_basin_spec, ")"))
 
 figure_5 <- figure_5_data %>% 
-  ggplot(aes(x = reorder(name_label, spec_mean), y = spec_mean, shape = lake_cat))+
+  ggplot(aes(x = reorder(name_label, spec_mean), y = spec_mean, col = lake_cat))+
   geom_point()+
   scale_y_continuous(breaks = seq(0, 1, 0.25), limits = c(0, 1))+
   coord_flip()+
-  scale_shape_manual(values = c("Natural" = 1, "New" = 19), name = "Lake group")+
+  scale_color_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")+
   xlab("Species")+
   ylab("Average frequency")+
   theme(panel.grid.major.y = element_line(size = 0.5, colour = "grey"),
