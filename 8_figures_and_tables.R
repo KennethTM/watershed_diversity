@@ -204,7 +204,7 @@ groups_boxplot <- model_data_psem |>
   select(n_spec_lake, groups, signif_groups) |> 
   group_by(groups) |> 
   add_tally() |> 
-  mutate(tally_label = paste0("n = ", n),
+  mutate(tally_label = paste0("n=", n),
          groups_short = gsub("Connected", "Conn.", groups),
          groups_short = gsub("connected", "conn.", groups_short)) |> 
   ggplot(aes(groups_short, n_spec_lake))+
