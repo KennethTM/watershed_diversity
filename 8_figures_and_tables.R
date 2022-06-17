@@ -193,16 +193,37 @@ lake_map <- figure_2_data %>%
   #scale_shape_manual(values = c("Natural" = 1, "New" = 19), name = "Lake group")+
   #guides(linetype = guide_legend(title = NULL, order = 2), colour = guide_legend(order = 1))
 
-lake_freq <- figure_2_data %>% 
-  st_drop_geometry() %>% 
-  ggplot(aes(x=n_spec_lake))+
-  geom_histogram(fill = "white", col = "black", binwidth = 1)+
-  geom_density(aes(y=..count.., col = lake_cat), position = position_stack())+
-  #scale_linetype_manual(values=c("Natural"=1, "New"= 3), name = "Lake group")+
-  scale_colour_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")+
-  ylab("Frequency")+
-  xlab("Species richness")+
-  scale_y_continuous(expand = expansion(mult = c(0, 0.1)))
+groups_boxplot <- model_data_psem |> 
+  mutate(connection = ifelse(lake_stream_connect == 0, "Not connected", "Connected"),
+         natural = ifelse(lake_natural == 1, "Natural", "New"),
+         groups = paste0(natural, "\n", connection),
+         signif_groups = case_when(groups == "Natural\nConnected" ~ "A",
+                                   groups == "Natural\nNot connected" ~ "B",
+                                   groups == "New\nConnected" ~ "A",
+                                   groups == "New\nNot connected" ~ "B")) |> 
+  select(n_spec_lake, groups, signif_groups) |> 
+  group_by(groups) |> 
+  add_tally() |> 
+  mutate(tally_label = paste0("n = ", n),
+         groups_short = gsub("Connected", "Conn.", groups),
+         groups_short = gsub("connected", "conn.", groups_short)) |> 
+  ggplot(aes(groups_short, n_spec_lake))+
+  geom_boxplot(coef=2)+
+  geom_text(aes(y=17, label = tally_label), check_overlap=TRUE)+
+  geom_text(aes(y=15, label = signif_groups), check_overlap=TRUE)+
+  ylab("Species richness")+
+  xlab("Lake group")
+
+# lake_freq <- figure_2_data %>% 
+#   st_drop_geometry() %>% 
+#   ggplot(aes(x=n_spec_lake))+
+#   geom_histogram(fill = "white", col = "black", binwidth = 1)+
+#   geom_density(aes(y=..count.., col = lake_cat), position = position_stack())+
+#   #scale_linetype_manual(values=c("Natural"=1, "New"= 3), name = "Lake group")+
+#   scale_colour_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")+
+#   ylab("Frequency")+
+#   xlab("Species richness")+
+#   scale_y_continuous(expand = expansion(mult = c(0, 0.1)))
 
 #Spec vs age plot
 spec_vs_age_data <- figure_2_data %>% 
@@ -233,7 +254,7 @@ spec_vs_age <- figure_2_data %>%
   ylab("Species richness")+
   xlab("Lake age (years)")
 
-figure_2 <- lake_map + lake_freq + spec_vs_age + plot_layout(ncol = 1, heights = c(1.4, 1, 1), widths = 1) + plot_annotation(tag_levels = "A")
+figure_2 <- lake_map + groups_boxplot + spec_vs_age + plot_layout(ncol = 1, heights = c(1.4, 1, 1), widths = 1) + plot_annotation(tag_levels = "A")
 
 figure_2
 
