@@ -102,8 +102,7 @@ as.data.frame(coefs(psem_mod)) %>%
 #             data = mutate(model_data_psem,
 #                           lake_stream_connect = as.factor(ifelse(lake_stream_connect == 1, "connect", "disconnect")),
 #                           lake_natural = as.factor(ifelse(lake_natural == 1, "natural", "new"))), family = "poisson", nAGQ=0)
-# 
+# summary(lake_level)
 # lake_level_em <- emmeans(lake_level,  ~ lake_natural*lake_stream_connect)
-# 
 # emmip(lake_level, lake_natural ~ lake_stream_connect)
 # emmeans(lake_level, specs= pairwise ~ lake_natural * lake_stream_connect)

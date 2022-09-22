@@ -263,6 +263,8 @@ ggsave(paste0(getwd(), "/figures/figure_2.png"), figure_2, units = "mm", width =
 #Figure 3 PSEM MODEL
 
 #Figure 4 NMDS
+library(pairwiseAdonis)
+
 fish_species_wide <- fish_species_lakes %>%
   st_drop_geometry() %>% 
   as_tibble() %>% 
@@ -271,35 +273,39 @@ fish_species_wide <- fish_species_lakes %>%
   na.omit() %>% #remove no catch lakes
   mutate(presence = 1) %>% 
   spread(fish_id, presence) %>% 
-  slice(-197) #outlier
+  slice(-197) |> #outlier 
+  mutate(lake_cat = factor(ifelse(lake_age_bins == "Unknown", "Natural", "New"), levels = c("New", "Natural")),
+         stream_network = ifelse(lake_stream_connect == 1, "Connected", "Not connected"),
+         comb_fact = factor(paste(lake_cat, stream_network)))
   
 spec_matrix <- fish_species_wide %>% 
-  select(-gml_id, -lake_natural, -lake_age_bins, -lake_stream_connect) %>% 
+  select(-gml_id, -lake_natural, -lake_age_bins, -lake_stream_connect, 
+         -lake_cat, -stream_network, -comb_fact) %>% 
   as.matrix()
 spec_matrix[is.na(spec_matrix)] <- 0
 
 spec_bray <- vegdist(spec_matrix, method="bray")
-#spec_nmds <- cmdscale(spec_bray, k=(nrow(spec_matrix)-1), eig=TRUE)
+
+perm_test <- pairwise.adonis(spec_bray, fish_species_wide$comb_fact, p.adjust.m = "holm")
+perm_test
+
+# perm_test <- adonis2(spec_bray ~ lake_cat+stream_network, 
+#                      data = fish_species_wide, 
+#                      permutations = 999, method = "bray")
+# perm_test
 
 spec_nmds <- metaMDS(spec_bray, distance = "bray", k = 3, maxit = 1000, trymax = 500, wascores = TRUE, noshare=TRUE)
 
-nmds_data <- data.frame(dim1 = spec_nmds$points[, 1], 
-                        dim2 = spec_nmds$points[, 2],
-                        lake_age_bins = fish_species_wide$lake_age_bins,
-                        lake_stream_connect = fish_species_wide$lake_stream_connect) %>% 
-  mutate(lake_cat = factor(ifelse(lake_age_bins == "Unknown", "Natural", "New"), levels = c("New", "Natural")),
-         `Stream network` = ifelse(lake_stream_connect == 1, "Connected", "Not connected"))
-
-nmds_hull <- nmds_data %>%
-  group_by(lake_cat) %>% 
-  slice(chull(dim1, dim2))
+nmds_data <- cbind(dim1 = spec_nmds$points[, 1], 
+                   dim2 = spec_nmds$points[, 2],
+                   fish_species_wide)
 
 figure_4 <- nmds_data %>% 
-  ggplot(aes(dim1, dim2, shape=`Stream network`, col = lake_cat)) +
-  geom_polygon(data = nmds_hull, inherit.aes = FALSE, aes(x=dim1, y=dim2, col=lake_cat), fill=NA, show.legend = FALSE)+
+  ggplot(aes(dim1, dim2, linetype=stream_network, col = lake_cat, shape = stream_network)) +
   geom_point()+
-  #scale_linetype_manual(values=c("Natural"= 3, "New"= 1), name = "Lake group")+
-  scale_shape_manual(values = c("Connected" = 19, "Not connected" = 1))+
+  stat_ellipse()+
+  scale_linetype_manual(values=c("Connected"= 1, "Not connected"= 2), name = "Stream network")+
+  scale_shape_manual(values = c("Connected" = 19, "Not connected" = 1), name = "Stream network")+
   scale_color_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")+
   guides(linetype = guide_legend(order = 3), colour = guide_legend(order = 1), shape = guide_legend(order = 2))+
   xlab("NMDS1")+
