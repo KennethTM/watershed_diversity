@@ -189,9 +189,7 @@ lake_map <- figure_2_data %>%
   geom_sf(data = dk_border, col = "grey", fill = NA)+
   geom_sf(aes(col = lake_cat), size = 0.7)+
   geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "coral", linetype = 1, show.legend = FALSE)+
-  scale_colour_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")
-  #scale_shape_manual(values = c("Natural" = 1, "New" = 19), name = "Lake group")+
-  #guides(linetype = guide_legend(title = NULL, order = 2), colour = guide_legend(order = 1))
+  scale_colour_manual(values = c("Natural" = "black", "New" = viridis(5)[4]), name = "Lake group")
 
 groups_boxplot <- model_data_psem |> 
   mutate(connection = ifelse(lake_stream_connect == 0, "Not connected", "Connected"),
@@ -214,17 +212,6 @@ groups_boxplot <- model_data_psem |>
   ylab("Species richness")+
   xlab("Lake group")
 
-# lake_freq <- figure_2_data %>% 
-#   st_drop_geometry() %>% 
-#   ggplot(aes(x=n_spec_lake))+
-#   geom_histogram(fill = "white", col = "black", binwidth = 1)+
-#   geom_density(aes(y=..count.., col = lake_cat), position = position_stack())+
-#   #scale_linetype_manual(values=c("Natural"=1, "New"= 3), name = "Lake group")+
-#   scale_colour_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")+
-#   ylab("Frequency")+
-#   xlab("Species richness")+
-#   scale_y_continuous(expand = expansion(mult = c(0, 0.1)))
-
 #Spec vs age plot
 spec_vs_age_data <- figure_2_data %>% 
   st_drop_geometry() %>% 
@@ -232,15 +219,6 @@ spec_vs_age_data <- figure_2_data %>%
 
 spec_vs_age_glm <- glm(n_spec_lake ~ lake_age * lake_stream_connect, family = "poisson", data = spec_vs_age_data)
 summary(spec_vs_age_glm)
-
-# ilink <- family(spec_vs_age_glm)$linkinv
-# 
-# glm_pred_df <- data.frame(lake_age = 0:30) %>% 
-#   mutate(fit_link = predict(spec_vs_age_glm, newdata= ., se.fit=TRUE)$fit, 
-#          se_link = predict(spec_vs_age_glm, newdata= ., se.fit=TRUE)$se.fit) %>% 
-#   mutate(fit_resp  = ilink(fit_link),
-#          right_upr = ilink(fit_link + (2 * se_link)),
-#          right_lwr = ilink(fit_link - (2 * se_link)))
 
 spec_vs_age <- figure_2_data %>% 
   filter(lake_cat=="New") %>% 
@@ -273,20 +251,20 @@ fish_species_wide <- fish_species_lakes %>%
   na.omit() %>% #remove no catch lakes
   mutate(presence = 1) %>% 
   spread(fish_id, presence) %>% 
-  slice(-197) |> #outlier 
+  slice(-197) |> #remove outlier that affects nmds analysis and visualization
   mutate(lake_cat = factor(ifelse(lake_age_bins == "Unknown", "Natural", "New"), levels = c("New", "Natural")),
          stream_network = ifelse(lake_stream_connect == 1, "Connected", "Not connected"),
-         comb_fact = factor(paste(lake_cat, stream_network)))
+         groups = factor(paste(lake_cat, stream_network)))
   
 spec_matrix <- fish_species_wide %>% 
   select(-gml_id, -lake_natural, -lake_age_bins, -lake_stream_connect, 
-         -lake_cat, -stream_network, -comb_fact) %>% 
+         -lake_cat, -stream_network, -groups) %>% 
   as.matrix()
 spec_matrix[is.na(spec_matrix)] <- 0
 
 spec_bray <- vegdist(spec_matrix, method="bray")
 
-perm_test <- pairwise.adonis(spec_bray, fish_species_wide$comb_fact, p.adjust.m = "holm")
+perm_test <- pairwise.adonis(spec_bray, fish_species_wide$groups, p.adjust.m = "holm")
 perm_test
 
 # perm_test <- adonis2(spec_bray ~ lake_cat+stream_network, 
@@ -301,12 +279,14 @@ nmds_data <- cbind(dim1 = spec_nmds$points[, 1],
                    fish_species_wide)
 
 figure_4 <- nmds_data %>% 
-  ggplot(aes(dim1, dim2, linetype=stream_network, col = lake_cat, shape = stream_network)) +
+  mutate(`Lake group` = gsub("connected", "conn.", str_to_sentence(groups))) |> 
+  ggplot(aes(dim1, dim2, col = `Lake group`)) +
   geom_point()+
   stat_ellipse()+
-  scale_linetype_manual(values=c("Connected"= 1, "Not connected"= 2), name = "Stream network")+
-  scale_shape_manual(values = c("Connected" = 19, "Not connected" = 1), name = "Stream network")+
-  scale_color_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")+
+  scale_color_viridis_d()+
+  #scale_linetype_manual(values=c("Connected"= 1, "Not connected"= 2), name = "Stream network")+
+  #scale_shape_manual(values = c("Connected" = 19, "Not connected" = 1), name = "Stream network")+
+  #scale_color_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")+
   guides(linetype = guide_legend(order = 3), colour = guide_legend(order = 1), shape = guide_legend(order = 2))+
   xlab("NMDS1")+
   ylab("NMDS2")
