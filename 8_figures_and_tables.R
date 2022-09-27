@@ -273,16 +273,18 @@ nmds_data <- cbind(dim1 = spec_nmds$points[, 1],
                    dim2 = spec_nmds$points[, 2],
                    fish_species_wide)
 
+group_colors <- RColorBrewer::brewer.pal(10, "Paired")[c(4, 3, 2, 1)]
+
 figure_4 <- nmds_data %>% 
   mutate(`Lake group` = gsub("connected", "conn.", str_to_sentence(groups)),
          `Lake group` = factor(`Lake group`, levels = c("Natural conn.", "Natural not conn.", "New conn.", "New not conn."))) |> 
   ggplot(aes(dim1, dim2, col = `Lake group`)) +
   geom_point()+
   stat_ellipse()+
-  scale_color_manual(values=RColorBrewer::brewer.pal(10, "Paired")[c(4, 3, 2, 1)])+
-  #scale_linetype_manual(values=c("Connected"= 1, "Not connected"= 2), name = "Stream network")+
-  #scale_shape_manual(values = c("Connected" = 19, "Not connected" = 1), name = "Stream network")+
-  #scale_color_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")+
+  scale_color_manual(values=c("Natural conn." = group_colors[1],
+                              "Natural not conn." = group_colors[2],
+                              "New conn." = group_colors[3],
+                              "New not conn." = group_colors[4]))+
   guides(linetype = guide_legend(order = 3), colour = guide_legend(order = 1), shape = guide_legend(order = 2))+
   xlab("NMDS1")+
   ylab("NMDS2")
