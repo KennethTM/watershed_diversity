@@ -189,7 +189,7 @@ lake_map <- figure_2_data %>%
   geom_sf(data = dk_border, col = "grey", fill = NA)+
   geom_sf(aes(col = lake_cat), size = 0.7)+
   geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "coral", linetype = 1, show.legend = FALSE)+
-  scale_colour_manual(values = c("Natural" = "black", "New" = viridis(5)[4]), name = "Lake group")
+  scale_colour_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")
 
 groups_boxplot <- model_data_psem |> 
   mutate(connection = ifelse(lake_stream_connect == 0, "Not connected", "Connected"),
