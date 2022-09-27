@@ -267,11 +267,6 @@ spec_bray <- vegdist(spec_matrix, method="bray")
 perm_test <- pairwise.adonis(spec_bray, fish_species_wide$groups, p.adjust.m = "holm")
 perm_test
 
-# perm_test <- adonis2(spec_bray ~ lake_cat+stream_network, 
-#                      data = fish_species_wide, 
-#                      permutations = 999, method = "bray")
-# perm_test
-
 spec_nmds <- metaMDS(spec_bray, distance = "bray", k = 3, maxit = 1000, trymax = 500, wascores = TRUE, noshare=TRUE)
 
 nmds_data <- cbind(dim1 = spec_nmds$points[, 1], 
@@ -279,11 +274,12 @@ nmds_data <- cbind(dim1 = spec_nmds$points[, 1],
                    fish_species_wide)
 
 figure_4 <- nmds_data %>% 
-  mutate(`Lake group` = gsub("connected", "conn.", str_to_sentence(groups))) |> 
+  mutate(`Lake group` = gsub("connected", "conn.", str_to_sentence(groups)),
+         `Lake group` = factor(`Lake group`, levels = c("Natural conn.", "Natural not conn.", "New conn.", "New not conn."))) |> 
   ggplot(aes(dim1, dim2, col = `Lake group`)) +
   geom_point()+
   stat_ellipse()+
-  scale_color_viridis_d()+
+  scale_color_manual(values=RColorBrewer::brewer.pal(10, "Paired")[c(4, 3, 2, 1)])+
   #scale_linetype_manual(values=c("Connected"= 1, "Not connected"= 2), name = "Stream network")+
   #scale_shape_manual(values = c("Connected" = 19, "Not connected" = 1), name = "Stream network")+
   #scale_color_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")+
