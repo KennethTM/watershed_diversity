@@ -281,7 +281,7 @@ figure_4 <- nmds_data %>%
 figure_4
 
 ggsave(paste0(getwd(), "/figures/figure_4.png"), figure_4, units = "mm", width = 129, height = 100)
-ggsave(paste0(getwd(), "/figures/figure_5.png"), figure_4, units = "mm", width = 129, height = 100)
+ggsave(paste0(getwd(), "/figures/figure_4.pdf"), figure_4, units = "mm", width = 129, height = 100)
 
 #Figure 5 basin-lake species
 #Load and add to basin and lake species lists for species specific analysis
