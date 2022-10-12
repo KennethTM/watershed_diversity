@@ -71,10 +71,7 @@ table_1 <- model_data_proc %>%
   gather(variable, value) %>% 
   group_by(variable) %>% 
   summarise(Minimum=min(value), 
-            #`1st quantile` = quantile(value, 0.25), 
-            #Median=median(value), 
             Mean=mean(value), 
-            #`3rd quantile` = quantile(value, 0.75), 
             Maximum=max(value)) %>% 
   mutate(Note = case_when(variable == "n_spec_basin" ~ "Response",
                           variable %in% c("basin_area_m2", "basin_circum_m", "basin_elev_range_m", "basin_stream_length_m") ~ "Discarded",
@@ -105,10 +102,7 @@ table_2 <- model_data_proc %>%
   gather(variable, value, -lake_cat) %>% 
   group_by(variable, lake_cat) %>% 
   summarise(Minimum=min(value), 
-            #`1st quantile` = quantile(value, 0.25), 
-            #Median=median(value), 
             Mean=mean(value), 
-            #`3rd quantile` = quantile(value, 0.75), 
             Maximum=max(value)) %>% 
   ungroup() %>% 
   gather(stat, value, Minimum:Maximum) %>% 
@@ -129,8 +123,6 @@ write_csv(table_2, paste0(getwd(), "/figures/table_2.csv"))
 
 #Figure 1
 #Drainage basin species richness
-library(rmapshaper)
-
 basins <- st_read(gis_database, layer = "basins")
 basin_species_count <- read_csv(paste0(getwd(), "/data_processed/basin_species_count.csv"))
 
@@ -155,9 +147,6 @@ basin_freq <- basins_count %>%
   annotate("text", x = 4, y = 160, label = "829", size=3)+
   ylab("Frequency")+
   xlab("Basin richness")
-
-#xlabs <- seq(8, 12, 1)
-#ylabs <- seq(54.5, 57.5, 0.5)
 
 basin_richness <- basins_count %>% 
   ggplot()+
@@ -228,8 +217,6 @@ spec_vs_age <- figure_2_data %>%
   st_drop_geometry() %>% 
   mutate(`Stream network` = ifelse(lake_stream_connect == 1, "Connected", "Not connected")) %>% 
   ggplot(aes(lake_age, n_spec_lake, shape=`Stream network`))+
-  #geom_ribbon(data = glm_pred_df, inherit.aes = FALSE, aes(x=lake_age, ymin=right_lwr, ymax=right_upr), fill=grey(0.7))+
-  #geom_line(data = glm_pred_df, aes(y=fit_resp), size=1)+
   geom_point()+
   scale_shape_manual(values = c("Connected" = 19, "Not connected" = 1))+
   ylab("Species richness")+
@@ -245,8 +232,6 @@ ggsave(paste0(getwd(), "/figures/figure_2.pdf"), figure_2, units = "mm", width =
 #Figure 3 PSEM MODEL
 
 #Figure 4 NMDS
-library(pairwiseAdonis)
-
 fish_species_wide <- fish_species_lakes %>%
   st_drop_geometry() %>% 
   as_tibble() %>% 

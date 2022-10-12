@@ -4,6 +4,8 @@ library(link2GI);library(patchwork);library(lwgeom);
 library(exactextractr);library(mapview);library(corrplot);
 library(vegan);library(viridisLite);
 library(piecewiseSEM);library(lme4);library(emmeans);library(FSA)
+library(pairwiseAdonis);library(rmapshaper)
+
 
 #;library(gdalUtils)
 
