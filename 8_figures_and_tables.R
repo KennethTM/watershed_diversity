@@ -62,8 +62,8 @@ table_1 <- model_data_proc %>%
   select(basin_lake_area_m2, basin_stream_length_m, basin_arti, basin_agri, basin_elev_mean_m,
          basin_slope_prc, basin_area_m2, basin_circum_m, salinity, basin_elev_range_m, ice_covered, n_spec_basin) %>% 
   distinct() %>% 
-  mutate(basin_lake_area_m2 = basin_lake_area_m2*10^-4,
-         basin_area_m2 = basin_area_m2*10^-4,
+  mutate(basin_lake_area_m2 = basin_lake_area_m2*10^-6,
+         basin_area_m2 = basin_area_m2*10^-6,
          basin_stream_length_m = basin_stream_length_m*10^-3,
          basin_circum_m = basin_circum_m*10^-3,
          basin_arti = basin_arti*100,
@@ -99,8 +99,8 @@ table_2 <- model_data_proc %>%
   select(lake_elev_m, shoreline_m, bathy_area, bathy_vol, bathy_zmean, bathy_zmax,
          alk_mmol_l, chla_ug_l, tn_mg_l, ph_ph, tp_mg_l, secchi_depth_m,
          n_spec_lake, lake_stream_connect, lake_cat) %>% 
-  mutate(bathy_vol = bathy_vol*10^-3,
-         bathy_area = bathy_area*10^-4,
+  mutate(bathy_vol = bathy_vol*10^-6,
+         bathy_area = bathy_area*10^-6,
          shoreline_m = shoreline_m*10^-3) %>% 
   gather(variable, value, -lake_cat) %>% 
   group_by(variable, lake_cat) %>% 
@@ -129,13 +129,17 @@ write_csv(table_2, paste0(getwd(), "/figures/table_2.csv"))
 
 #Figure 1
 #Drainage basin species richness
+library(rmapshaper)
+
 basins <- st_read(gis_database, layer = "basins")
 basin_species_count <- read_csv(paste0(getwd(), "/data_processed/basin_species_count.csv"))
 
 basins_count <- basins %>% 
   left_join(basin_species_count) %>% 
   mutate(n_spec_basin = ifelse(is.na(n_spec_basin), 0, n_spec_basin)) %>% 
-  st_crop(st_bbox(dk_border))
+  st_crop(st_bbox(dk_border)) |> 
+  st_cast("MULTIPOLYGON") |> 
+  ms_simplify(keep=0.02)
 
 #Stats for drainage basin species richness
 table(basins_count$n_spec_basin)
@@ -158,11 +162,9 @@ basin_freq <- basins_count %>%
 basin_richness <- basins_count %>% 
   ggplot()+
   geom_sf(data = dk_border, fill = NA, col = "black")+
-  geom_sf(aes(fill = n_spec_basin), col = "black", size = 0.20)+
+  geom_sf(aes(fill = n_spec_basin), col = "black", size = 0.1)+
   geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "coral", linetype = 1, show.legend = FALSE)+
   scale_fill_viridis_c(na.value="white", option = "D", name = "Species richness", direction = -1, begin = 0.2)+
-  #scale_x_continuous(breaks = xlabs, labels = paste0(xlabs,'°E')) +
-  #scale_y_continuous(breaks = ylabs, labels = paste0(ylabs,'°N'))+
   theme(legend.position = "bottom")+
   guides(fill=guide_colorbar(title.position = "top", barwidth = 8, title.hjust = 0.5))
 
@@ -171,6 +173,7 @@ figure_1 <- basin_richness + basin_freq + plot_layout(ncol = 1, heights = c(1.5,
 figure_1
 
 ggsave(paste0(getwd(), "/figures/figure_1.png"), figure_1, units = "mm", width = 84, height = 160)
+ggsave(paste0(getwd(), "/figures/figure_1.pdf"), figure_1, units = "mm", width = 84, height = 160)
 
 #Figure 2
 #Lake richness plot
@@ -237,6 +240,7 @@ figure_2 <- lake_map + groups_boxplot + spec_vs_age + plot_layout(ncol = 1, heig
 figure_2
 
 ggsave(paste0(getwd(), "/figures/figure_2.png"), figure_2, units = "mm", width = 129, height = 200)
+ggsave(paste0(getwd(), "/figures/figure_2.pdf"), figure_2, units = "mm", width = 129, height = 200)
 
 #Figure 3 PSEM MODEL
 
@@ -292,6 +296,7 @@ figure_4 <- nmds_data %>%
 figure_4
 
 ggsave(paste0(getwd(), "/figures/figure_4.png"), figure_4, units = "mm", width = 129, height = 100)
+ggsave(paste0(getwd(), "/figures/figure_5.png"), figure_4, units = "mm", width = 129, height = 100)
 
 #Figure 5 basin-lake species
 #Load and add to basin and lake species lists for species specific analysis
@@ -346,3 +351,4 @@ figure_5 <- figure_5_data %>%
 figure_5
 
 ggsave(paste0(getwd(), "/figures/figure_5.png"), figure_5, units = "mm", width = 129, height = 150)
+ggsave(paste0(getwd(), "/figures/figure_5.pdf"), figure_5, units = "mm", width = 129, height = 150)
