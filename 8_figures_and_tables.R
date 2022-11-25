@@ -36,22 +36,6 @@ dunnTest(n_spec_lake ~ groups, data = kw_data, method="bonferroni")
 #Mean age
 mean(model_data_psem[model_data_psem$lake_age_bins != "Unknown", ]$lake_age)
 
-#Supplementary material
-
-#Table S1
-#Fish species included in the analysis
-#27 species
-table_s1_species <- fish_species_unique_edit %>% 
-  filter(fish_id %in% lake_fish_ids$fish_id) %>% 
-  select(name_atlas, fish_id) %>% 
-  distinct() %>% 
-  filter(name_atlas != "Gynmocephalus_cernua") %>% 
-  mutate(name_atlas = gsub("_", " ", name_atlas)) 
-
-table_s1_species %>% 
-  select(-fish_id) %>% 
-  write_csv(paste0(getwd(), "/figures/table_s1.csv"))
-
 #Tables in manuscript
 
 #Table 1
@@ -202,7 +186,7 @@ groups_boxplot <- model_data_psem |>
   geom_text(aes(y=17, label = tally_label), check_overlap=TRUE)+
   geom_text(aes(y=15, label = signif_groups), check_overlap=TRUE)+
   ylab("Species richness")+
-  xlab("Lake group")
+  xlab(NULL)
 
 #Spec vs age plot
 spec_vs_age_data <- figure_2_data %>% 
