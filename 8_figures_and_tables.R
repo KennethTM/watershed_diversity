@@ -312,7 +312,8 @@ figure_5_data <- left_join(basin_species, lake_species) %>%
   left_join(species_list) %>% 
   mutate(name_label = paste0(common, "~(", "italic(", name_atlas, ")", ")"),
          name_label = gsub(" ", "~", name_label),
-         name_label = gsub("-", "*'-'*", name_label))
+         name_label = gsub("-", "*'-'*", name_label),
+         name_label = gsub("lavaretus", "maraena", name_label))
 
 figure_5 <- figure_5_data %>% 
   ggplot(aes(x = reorder(factor(name_label), spec_mean), y = spec_mean, col = lake_cat))+
