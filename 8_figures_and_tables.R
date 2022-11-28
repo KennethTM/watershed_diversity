@@ -19,6 +19,14 @@ fish_species_lakes <- st_read(dsn = gis_database, layer = "fish_species_lakes")
 lake_fish_ids <- read_csv(paste0(getwd(), "/data_processed/lake_fish_ids.csv"))
 fish_species_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/fish_species_unique.xlsx"))
 
+#Species list
+species_list <- fish_species_unique_edit %>% 
+  filter(fish_id %in% lake_fish_ids$fish_id) %>% 
+  select(name_atlas, fish_id, common) %>% 
+  distinct() %>% 
+  filter(name_atlas != "Gynmocephalus_cernua") %>% 
+  mutate(name_atlas = gsub("_", " ", name_atlas)) 
+
 #Mann Whitney U-test
 wilcox.test(model_data_psem$n_spec_lake ~ model_data_psem$lake_age_bins == "Unknown")
 
@@ -301,23 +309,27 @@ figure_5_data <- left_join(basin_species, lake_species) %>%
   summarise(spec_mean = mean(n_occur/n_lake)) %>% 
   filter(spec_mean > 0) %>% 
   left_join(basin_per_spec) %>% 
-  left_join(table_s1_species) %>% 
-  mutate(name_label = paste0(name_atlas, " (", n_basin_spec, ")"))
+  left_join(species_list) %>% 
+  mutate(name_label = paste0(common, "~(", "italic(", name_atlas, ")", ")"),
+         name_label = gsub(" ", "~", name_label),
+         name_label = gsub("-", "*'-'*", name_label))
 
 figure_5 <- figure_5_data %>% 
-  ggplot(aes(x = reorder(name_label, spec_mean), y = spec_mean, col = lake_cat))+
+  ggplot(aes(x = reorder(factor(name_label), spec_mean), y = spec_mean, col = lake_cat))+
   geom_point()+
   scale_y_continuous(breaks = seq(0, 1, 0.25), limits = c(0, 1))+
+  scale_x_discrete(labels = scales::label_parse())+ 
   coord_flip()+
   scale_color_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")+
   xlab("Species")+
   ylab("Average frequency")+
+  geom_text(aes(y=1, label = n_basin_spec), check_overlap = TRUE, color="black", size=3)+
   theme(panel.grid.major.y = element_line(size = 0.5, colour = "grey"),
         legend.position = c(0.7, 0.15),
-        axis.text.y = element_text(face = "italic"),
+        #axis.text.y = element_text(face = "italic"),
         legend.background = element_rect(colour = "black", size = 0.25))
 
 figure_5
 
-ggsave(paste0(getwd(), "/figures/figure_5.png"), figure_5, units = "mm", width = 129, height = 150)
-ggsave(paste0(getwd(), "/figures/figure_5.pdf"), figure_5, units = "mm", width = 129, height = 150)
+ggsave(paste0(getwd(), "/figures/figure_5.png"), figure_5, units = "mm", width = 174, height = 150)
+ggsave(paste0(getwd(), "/figures/figure_5.pdf"), figure_5, units = "mm", width = 174, height = 150)
