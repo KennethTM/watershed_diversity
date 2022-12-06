@@ -82,7 +82,7 @@ fish_species_unique <- fish_species %>%
   arrange(name_danish) %>%
   na.omit()
 
-#Fish species for further analysis and create fish species id
+#Create fish species id and remove hybrids, exotic species or non-freshwater species
 #Actions: 0=do_nothing, 1=remove_species, 2=remove_lake (brackish or marine)
 fish_species_unique_edit <- read_xlsx(paste0(getwd(), "/data_raw/fish_species_unique.xlsx")) %>% 
   rename(action = `how(0=do_nothing)(1=remove_species)(2=remove_lake)`)
@@ -125,6 +125,26 @@ atlas_clean <- atlas_raw %>%
   select(-action)
 
 write_csv(atlas_clean, paste0(getwd(), "/data_processed/atlas_clean.csv"))
+
+#Data for Table S1 data
+table_s1_1 <- fish_species |> 
+  select(name_danish, x=Xutm_Euref89_Zone32, y = Yutm_Euref89_Zone32) |>
+  na.omit() |> 
+  st_as_sf(crs=25832, coords=c("x", "y")) |> 
+  st_join(basins[,c("basin_id")]) |> 
+  st_drop_geometry() |>
+  na.omit() |> 
+  distinct() |> 
+  group_by(name_danish) |> 
+  summarise(n_basin = n())
+
+table_s1_2 <- atlas_raw |> 
+  group_by(name_atlas) |> 
+  summarise(n_basin = n())
+
+bind_rows(table_s1_1, table_s1_2) |> 
+  select(name_danish, name_atlas, n_basin) |> 
+  write_csv("figures/table_s1_raw.csv")
 
 #Lakes for investigation is year with highest richness after 2006
 fish_species_richest_survey <- fish_species_sub %>% 

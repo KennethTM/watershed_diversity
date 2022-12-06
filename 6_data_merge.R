@@ -39,7 +39,7 @@ basin_species <- fish_species_basin %>%
   select(basin_id, fish_id) %>% 
   na.omit() %>% 
   bind_rows(atlas_clean) %>% 
-  filter(fish_id %in% lake_fish_ids) 
+  filter(fish_id %in% lake_fish_ids$fish_id) 
 
 basin_species_count <- basin_species %>% 
   group_by(basin_id) %>% 
