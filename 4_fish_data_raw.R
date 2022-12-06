@@ -146,7 +146,7 @@ atlas_raw |>
   write_csv("figures/table_s1_step_1.csv")
 
 #Table S1 continued
-table_s1_clean <- read_excel("figures/table_s1_revised.xlsx")
+table_s1_clean <- read_excel("figures/table_s1_revised.xlsx", sheet="step_1")
 
 table_s1_clean |> 
   distinct() |> 
