@@ -176,19 +176,21 @@ lake_map <- figure_2_data %>%
   scale_colour_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake type")
 
 groups_boxplot <- model_data_psem |> 
-  mutate(connection = ifelse(lake_stream_connect == 0, "Not connected", "Connected"),
+  mutate(connection = ifelse(lake_stream_connect == 0, "Disconnected", "Connected"),
          natural = ifelse(lake_natural == 1, "Natural", "New"),
          groups = paste0(natural, "\n", connection),
          signif_groups = case_when(groups == "Natural\nConnected" ~ "A",
-                                   groups == "Natural\nNot connected" ~ "B",
+                                   groups == "Natural\nDisconnected" ~ "B",
                                    groups == "New\nConnected" ~ "A",
-                                   groups == "New\nNot connected" ~ "B")) |> 
+                                   groups == "New\nDisconnected" ~ "B")) |> 
   select(n_spec_lake, groups, signif_groups) |> 
   group_by(groups) |> 
   add_tally() |> 
   mutate(tally_label = paste0("n=", n),
          groups_short = gsub("Connected", "Conn.", groups),
-         groups_short = gsub("connected", "conn.", groups_short)) |> 
+         groups_short = gsub("connected", "conn.", groups_short),
+         groups_short = gsub("C", "c", groups_short),
+         groups_short = gsub("D", "d", groups_short)) |> 
   ggplot(aes(groups_short, n_spec_lake))+
   geom_boxplot(coef=2)+
   geom_text(aes(y=17, label = tally_label), check_overlap=TRUE)+
@@ -207,10 +209,10 @@ summary(spec_vs_age_glm)
 spec_vs_age <- figure_2_data %>% 
   filter(lake_cat=="New") %>% 
   st_drop_geometry() %>% 
-  mutate(`Stream network` = ifelse(lake_stream_connect == 1, "Connected", "Not connected")) %>% 
+  mutate(`Stream network` = ifelse(lake_stream_connect == 1, "Connected", "Disconnected")) %>% 
   ggplot(aes(lake_age, n_spec_lake, shape=`Stream network`))+
   geom_point()+
-  scale_shape_manual(values = c("Connected" = 19, "Not connected" = 1))+
+  scale_shape_manual(values = c("Connected" = 19, "Disconnected" = 1))+
   ylab("Fish species richness")+
   xlab("Lake age (years)")
 
@@ -258,14 +260,15 @@ group_colors <- RColorBrewer::brewer.pal(10, "Paired")[c(4, 3, 2, 1)]
 
 figure_4 <- nmds_data %>% 
   mutate(`Lake group` = gsub("connected", "conn.", str_to_sentence(groups)),
-         `Lake group` = factor(`Lake group`, levels = c("Natural conn.", "Natural not conn.", "New conn.", "New not conn."))) |> 
+         `Lake group` = gsub("not conn.", "disconn.", `Lake group`),
+         `Lake group` = factor(`Lake group`, levels = c("Natural conn.", "Natural disconn.", "New conn.", "New disconn."))) |> 
   ggplot(aes(dim1, dim2, col = `Lake group`)) +
   geom_point()+
   stat_ellipse()+
   scale_color_manual(values=c("Natural conn." = group_colors[1],
-                              "Natural not conn." = group_colors[2],
+                              "Natural disconn." = group_colors[2],
                               "New conn." = group_colors[3],
-                              "New not conn." = group_colors[4]),
+                              "New disconn." = group_colors[4]),
                      name = "Lake type")+
   guides(linetype = guide_legend(order = 3), colour = guide_legend(order = 1), shape = guide_legend(order = 2))+
   xlab("NMDS1")+
