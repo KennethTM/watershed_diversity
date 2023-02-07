@@ -138,14 +138,14 @@ basin_freq <- basins_count %>%
   annotate("segment", x = 0, xend = 2, y = 155, yend = 160, colour = "black")+
   annotate("text", x = 4, y = 160, label = "829", size=3)+
   ylab("Frequency")+
-  xlab("Basin richness")
+  xlab("Drainage basin richness")
 
 basin_richness <- basins_count %>% 
   ggplot()+
   geom_sf(data = dk_border, fill = NA, col = "black")+
   geom_sf(aes(fill = n_spec_basin), col = "black", size = 0.1)+
   geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "coral", linetype = 1, show.legend = FALSE)+
-  scale_fill_viridis_c(na.value="white", option = "D", name = "Species richness", direction = -1, begin = 0.2)+
+  scale_fill_viridis_c(na.value="white", option = "D", name = "Fish species richness", direction = -1, begin = 0.2)+
   theme(legend.position = "bottom")+
   guides(fill=guide_colorbar(title.position = "top", barwidth = 8, title.hjust = 0.5))
 
@@ -173,7 +173,7 @@ lake_map <- figure_2_data %>%
   geom_sf(data = dk_border, col = "grey", fill = NA)+
   geom_sf(aes(col = lake_cat), size = 0.7)+
   geom_sf(data = dk_iceage_cut, aes(linetype = "Ice age"), col = "coral", linetype = 1, show.legend = FALSE)+
-  scale_colour_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")
+  scale_colour_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake type")
 
 groups_boxplot <- model_data_psem |> 
   mutate(connection = ifelse(lake_stream_connect == 0, "Not connected", "Connected"),
@@ -193,7 +193,7 @@ groups_boxplot <- model_data_psem |>
   geom_boxplot(coef=2)+
   geom_text(aes(y=17, label = tally_label), check_overlap=TRUE)+
   geom_text(aes(y=15, label = signif_groups), check_overlap=TRUE)+
-  ylab("Species richness")+
+  ylab("Fish species richness")+
   xlab(NULL)
 
 #Spec vs age plot
@@ -211,7 +211,7 @@ spec_vs_age <- figure_2_data %>%
   ggplot(aes(lake_age, n_spec_lake, shape=`Stream network`))+
   geom_point()+
   scale_shape_manual(values = c("Connected" = 19, "Not connected" = 1))+
-  ylab("Species richness")+
+  ylab("Fish species richness")+
   xlab("Lake age (years)")
 
 figure_2 <- lake_map + groups_boxplot + spec_vs_age + plot_layout(ncol = 1, heights = c(1.4, 1, 1), widths = 1) + plot_annotation(tag_levels = "A")
@@ -265,7 +265,8 @@ figure_4 <- nmds_data %>%
   scale_color_manual(values=c("Natural conn." = group_colors[1],
                               "Natural not conn." = group_colors[2],
                               "New conn." = group_colors[3],
-                              "New not conn." = group_colors[4]))+
+                              "New not conn." = group_colors[4]),
+                     name = "Lake type")+
   guides(linetype = guide_legend(order = 3), colour = guide_legend(order = 1), shape = guide_legend(order = 2))+
   xlab("NMDS1")+
   ylab("NMDS2")
@@ -321,7 +322,7 @@ figure_5 <- figure_5_data %>%
   scale_y_continuous(breaks = seq(0, 1, 0.25), limits = c(0, 1))+
   scale_x_discrete(labels = scales::label_parse())+ 
   coord_flip()+
-  scale_color_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake group")+
+  scale_color_manual(values = c("Natural" = "black", "New" = "dodgerblue"), name = "Lake type")+
   xlab("Species")+
   ylab("Average frequency")+
   geom_text(aes(y=1, label = n_basin_spec), check_overlap = TRUE, color="black", size=3)+
