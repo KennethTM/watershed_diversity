@@ -7,12 +7,12 @@ source("0_libs_and_funcs.R")
 
 dk_border <- st_read(gis_database, layer = "dk_border")
 
-#Submerged macrophyte and depth rawdata from www.odaforalle.au.dk
+#Submerged macrophyte and depth rawdata from www.odaforalle.au.dk (or https://miljoedata.miljoeportal.dk/)
 #Time period 01-01-1990 to 01-10-2020
 depth_area <- read_xlsx(paste0(getwd(), "/data_raw/odaforalle_depth_area_01102020.xlsx")) %>% 
   clean_names()
 
-#lake plant cover
+#Lake plant cover
 cover_to_pct <- tribble(~total_dækningsgrad, ~plant_cover,
                         "Ej oplyst", NA,
                         "0%", 0,
@@ -23,15 +23,15 @@ cover_to_pct <- tribble(~total_dækningsgrad, ~plant_cover,
                         "75-95%", 85.5,
                         "95-100%", 98)
 
-#lake coordinates
-# #correct wrong coordinates for skenkelsø
+#Lake coordinates
+#Correct wrong coordinates for Skenkelsø
 lake_coords <- depth_area %>%
   select(observationsstednr, observationsstednavn, xutm_euref89_zone32, yutm_euref89_zone32) %>%
   distinct() %>%
   mutate(xutm_euref89_zone32 = ifelse(observationsstednr == "52000929", 696273, xutm_euref89_zone32),
          yutm_euref89_zone32 = ifelse(observationsstednr == "52000929", 6188507, yutm_euref89_zone32))
 
-#lake bathymetry data
+#Lake bathymetry data
 lake_depth_area <- depth_area %>% 
   select(observationsstednr, observationsstednavn, startdato,
          dybden_fra_i_meter, dybden_til_i_meter, arealet_i_m2) %>% 
@@ -66,14 +66,14 @@ lake_level_stats_sf <- lake_bathy %>%
 
 st_write(lake_level_stats_sf, dsn = gis_database, layer = "lake_bathy", delete_layer = TRUE)
 
-#chemistry and secchi data
+#Chemistry and secchi data
 lake_secchi_raw <- read_xlsx(paste0(getwd(), "/data_raw/odaforalle_secchi_lake_09112020.xlsx")) %>% 
   clean_names()
 
 lake_chem_raw <- read_xlsx(paste0(getwd(), "/data_raw/odaforalle_chemistry_lake_09112020.xlsx")) %>% 
   clean_names()
 
-#combine data and keep summer observations
+#Combine data and keep summer observations
 lake_secchi_chem_raw <- bind_rows(lake_chem_raw, lake_secchi_raw) %>% 
   mutate(date = ymd(startdato), 
          year = year(date), 

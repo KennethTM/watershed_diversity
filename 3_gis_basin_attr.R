@@ -3,7 +3,7 @@ source("0_libs_and_funcs.R")
 #Calculate attributes for each basin:
 #Ice-cover during last ice age
 #Stream length and lake area
-#CLC agriculture and artifical area
+#CLC agriculture and artificial area
 #DEM morphometry
 
 #Load data

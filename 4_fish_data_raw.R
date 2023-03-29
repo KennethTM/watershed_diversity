@@ -166,8 +166,8 @@ fish_species_richest_survey <- fish_species_sub %>%
 #site_id's to be exclude
 #Two double sampling from the same lake
 #Different sampling in same lake (Utterslev Mose)
-fish_lake_doubles <- c(c(14000045, 20000218),
-                       c(53000046, 53000047))
+fish_lake_doubles <- c(14000045, 20000218,
+                       53000046, 53000047)
 
 #Lakes for investigation
 fish_species_lakes_raw <- fish_species_richest_survey %>% 

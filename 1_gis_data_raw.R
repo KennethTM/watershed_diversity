@@ -13,6 +13,7 @@ dk_border <- dk_border_raw %>%
 st_write(dk_border, dsn = gis_database, layer = "dk_border", delete_layer = TRUE)
 
 #Lines of ice progression during last ice age (data from GEUS)
+#https://frisbee.geus.dk/geuswebshop/index.xhtml
 ice_poly <- st_read(paste0(getwd(), "/data_raw/Isrande/Isrand_poly.shp")) %>% 
   slice(1) %>% 
   st_transform(dk_epsg) %>% 

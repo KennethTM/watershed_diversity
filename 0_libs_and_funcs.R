@@ -6,8 +6,7 @@ library(vegan);library(viridisLite);
 library(piecewiseSEM);library(lme4);library(emmeans);library(FSA)
 library(pairwiseAdonis);library(rmapshaper)
 
-
-#;library(gdalUtils)
+#library(gdalUtils) #No longer available, use 'gdalUtilities' package instead
 
 #Load libraries and define useful functions and constants used in other scripts
 
@@ -106,11 +105,12 @@ clean_names <- function(df){
   return(df)
 }
 
+#Functions for processing lake area-depth relationships
 approx_bathy <- function(data){
   if(nrow(data) == 1){
     fun <- NULL
   }else if(min(data$dybden_fra_i_meter, na.rm = TRUE) != 0){
-    fun <- NULL #one exception
+    fun <- NULL #One exception
   }else{
     depths <- c(max(data$dybden_til_i_meter), data$dybden_fra_i_meter)
     areas <- c(0, data$area_accum)
