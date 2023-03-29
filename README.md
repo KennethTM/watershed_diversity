@@ -2,7 +2,9 @@
 
 ## Project acronym: watershed_diversity
 
-Repository containing code for analysis and figures for the paper published in Freshwater Biology on fish species richness and assemblage in Danish lakes and drainage basins.
+Repository containing scripts for analysis and figures for the paper published in Freshwater Biology on fish species richness and assemblage in Danish lakes and drainage basins. The analyses were conducted using R (version >= 4.1).
+
+Data from the national environmental monitoring program and other geospatial data are publicly available from sources cited in the main text. The Fish Atlas data are not publicly available.
 
 **Title:** Environmental predictors of lake fish diversity across gradients in lake age and spatial scale
 
