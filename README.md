@@ -2,7 +2,7 @@
 
 ## Project acronym: watershed_diversity
 
-Repository containing code for analysis and figures the a paper published in Freshwater Biology on fish species richness and assemblage in Danish lakes and drainage basins.
+Repository containing code for analysis and figures for the paper published in Freshwater Biology on fish species richness and assemblage in Danish lakes and drainage basins.
 
 **Title:** Environmental predictors of lake fish diversity across gradients in lake age and spatial scale
 
@@ -24,4 +24,4 @@ Repository containing code for analysis and figures the a paper published in Fre
 
 <sup>7</sup>University of Southern Denmark, Department of Biology, Campusvej 55, 5230 Odense, Denmark
 
-**\*Corresponding author**: Kenneth Thorø Martinsen, [kenneth.martinsen\@bio.ku.dk](mailto:kenneth.martinsen@bio.ku.dk){.email}
+**\*Corresponding author**: Kenneth Thorø Martinsen, [kenneth.martinsen\@bio.ku.dk](mailto:kenneth.martinsen@bio.ku.dk)
